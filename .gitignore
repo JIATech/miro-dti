@@ -1,2 +1,11 @@
 node_modules/
 *.log
+mirotalksfu/node_modules
+admin/node_modules
+admin/logs
+signaling/node_modules
+pwa/node_modules
+.env
+.env.*
+!.env.example
+.dev-pids

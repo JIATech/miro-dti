@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Finalizando llamada...</title>
+    <script src="http://localhost:3000/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #2196f3;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        h1 {
+            margin-bottom: 15px;
+        }
+        p {
+            margin-bottom: 30px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="spinner"></div>
+    <h1>Finalizando llamada</h1>
+    <p>Por favor espere, regresando al inicio...</p>
+
+    <script>
+        // Función para obtener parámetros de la URL
+        function getUrlParams() {
+            const params = {};
+            new URLSearchParams(window.location.search).forEach((value, key) => {
+                params[key] = value;
+            });
+            return params;
+        }
+
+        // Obtener parámetros
+        const params = getUrlParams();
+        const { room, from, to, action } = params;
+
+        // Conectar con el servidor de señalización
+        const socket = io('http://localhost:3000');
+
+        // Cuando se conecte al servidor
+        socket.on('connect', () => {
+            console.log('Conectado al servidor de señalización');
+            
+            // Si tenemos información de la sala, notificar que se colgó la llamada
+            if (room) {
+                console.log(`Notificando finalización de llamada en sala: ${room}`);
+                socket.emit('callHangup', { room });
+                
+                // Esperar un momento para asegurar que el mensaje se envíe
+                setTimeout(() => {
+                    // Redirigir a la página principal
+                    window.location.href = '/index.html';
+                }, 1500);
+            } else {
+                // Si no hay información de sala, redirigir inmediatamente
+                window.location.href = '/index.html';
+            }
+        });
+
+        // Si hay error de conexión, redirigir de todos modos
+        socket.on('connect_error', () => {
+            console.error('Error al conectar con el servidor de señalización');
+            setTimeout(() => {
+                window.location.href = '/index.html';
+            }, 1000);
+        });
+
+        // Establecer un tiempo máximo de espera
+        setTimeout(() => {
+            window.location.href = '/index.html';
+        }, 3000);
+    </script>
+</body>
+</html>

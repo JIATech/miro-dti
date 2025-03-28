@@ -12,24 +12,20 @@ services:
     container_name: intercom-pwa
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "${PWA_PORT}:80"
     networks:
       - intercom-network
     depends_on:
       - signaling
       - mirotalksfu
+    environment:
+      - LOCAL_IP=${LOCAL_IP}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:80"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-    # En producción puedes habilitar límites de recursos
-    # deploy:
-    #   resources:
-    #     limits:
-    #       cpus: '0.5'
-    #       memory: 256M
 
   signaling:
     build: 
@@ -38,12 +34,12 @@ services:
     container_name: intercom-signaling
     restart: unless-stopped
     environment:
-      - NODE_ENV=production
-      - SIGNALING_PORT=3000
-      # Habilitar para conexión con la PWA
-      - CORS_ORIGIN=http://intercom-pwa
+      - NODE_ENV=development
+      - SIGNALING_PORT=${SIGNALING_PORT}
+      - CORS_ORIGIN=*
+      - LOCAL_IP=${LOCAL_IP}
     ports:
-      - "3000:3000"
+      - "${SIGNALING_PORT}:3000"
     networks:
       - intercom-network
     volumes:
@@ -54,12 +50,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    # En producción puedes habilitar límites de recursos
-    # deploy:
-    #   resources:
-    #     limits:
-    #       cpus: '1'
-    #       memory: 512M
 
   mirotalksfu:
     build: 
@@ -68,22 +58,20 @@ services:
     container_name: intercom-mirotalksfu
     restart: unless-stopped
     environment:
-      - NODE_ENV=production
-      - SFU_PORT=8080
-      - SFU_MIN_PORT=40000
-      - SFU_MAX_PORT=50000
+      - NODE_ENV=development
+      - SFU_PORT=${SFU_PORT}
+      - SFU_MIN_PORT=${SFU_MIN_PORT}
+      - SFU_MAX_PORT=${SFU_MAX_PORT}
       - SFU_LISTEN_IP=0.0.0.0
-      # Para producción, configurar la IP pública del servidor
-      # - SFU_PUBLIC_IP=tu_ip_pública
-      - API_KEY_SECRET=intercom_api_secret
-      - JWT_KEY=intercom_jwt_secret
+      - SFU_PUBLIC_IP=${LOCAL_IP}
+      - API_KEY_SECRET=intercom_dev_api_secret
+      - JWT_KEY=intercom_dev_jwt_secret
     ports:
-      - "8080:8080/tcp"
-      - "40000-50000:40000-50000/udp"
+      - "${SFU_PORT}:8080/tcp"
+      - "${SFU_MIN_PORT}-${SFU_MAX_PORT}:${SFU_MIN_PORT}-${SFU_MAX_PORT}/udp"
     networks:
       - intercom-network
     volumes:
-      # Persistencia para grabaciones (si se habilitan)
       - ./mirotalksfu/app/rec:/app/app/rec
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080"]
@@ -91,9 +79,32 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
-    # En producción puedes habilitar límites de recursos
-    # deploy:
-    #   resources:
-    #     limits:
-    #       cpus: '2'
-    #       memory: 2G
+
+  admin:
+    build: 
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: intercom-admin
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - ADMIN_PORT=${ADMIN_PORT}
+      - ADMIN_USER=${ADMIN_USER}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - LOCAL_IP=${LOCAL_IP}
+    ports:
+      - "${ADMIN_PORT}:8090"
+    networks:
+      - intercom-network
+    volumes:
+      - ./admin/logs:/app/logs
+    depends_on:
+      - pwa
+      - signaling
+      - mirotalksfu
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8090"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

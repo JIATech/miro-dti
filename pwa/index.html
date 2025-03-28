@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2196f3">
+    <title>Sistema Intercom</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- PWA metadata -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <!-- Socket.IO para comunicación con el servidor de señalización -->
+    <script src="http://localhost:3000/socket.io/socket.io.js"></script>
+    <!-- Prevent caching for development -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Sistema de Intercom</h1>
+            <div class="role-selector">
+                <label for="role">Seleccionar Rol:</label>
+                <select id="role">
+                    <option value="portero">Portero</option>
+                    <option value="administracion">Administración</option>
+                </select>
+            </div>
+        </header>
+
+        <main>
+            <!-- Portero Interface -->
+            <div id="portero-interface" class="role-interface">
+                <h2>Panel de Portero</h2>
+                <div class="buttons-grid">
+                    <button class="call-button" data-target="administracion">
+                        <span class="icon">👥</span>
+                        <span class="label">Administración</span>
+                    </button>
+                    <button class="call-button" data-target="sistemas">
+                        <span class="icon">💻</span>
+                        <span class="label">Sistemas</span>
+                    </button>
+                    <button class="call-button" data-target="soporte">
+                        <span class="icon">🛠️</span>
+                        <span class="label">Soporte</span>
+                    </button>
+                    <button class="call-button" data-target="infraestructura">
+                        <span class="icon">🏢</span>
+                        <span class="label">Infraestructura</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Administracion Interface -->
+            <div id="administracion-interface" class="role-interface hidden">
+                <h2>Panel de Administración</h2>
+                <div class="buttons-grid">
+                    <button class="call-button" data-target="portero">
+                        <span class="icon">🚪</span>
+                        <span class="label">Portero</span>
+                    </button>
+                    <button class="call-button" data-target="sistemas">
+                        <span class="icon">💻</span>
+                        <span class="label">Sistemas</span>
+                    </button>
+                    <button class="call-button" data-target="soporte">
+                        <span class="icon">🛠️</span>
+                        <span class="label">Soporte</span>
+                    </button>
+                    <button class="call-button" data-target="infraestructura">
+                        <span class="icon">🏢</span>
+                        <span class="label">Infraestructura</span>
+                    </button>
+                    <button class="call-button" data-target="recursos">
+                        <span class="icon">👤</span>
+                        <span class="label">Recursos Humanos</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Call interface (hidden initially) -->
+            <div id="call-interface" class="hidden">
+                <div class="call-status">
+                    <h2>Llamando a <span id="call-target"></span></h2>
+                    <div class="call-timer">00:00</div>
+                </div>
+                <div class="call-controls">
+                    <button id="hangup-btn" class="action-button hangup">
+                        <span class="icon">📞</span>
+                        <span class="label">Colgar</span>
+                    </button>
+                    <button id="mute-btn" class="action-button mute">
+                        <span class="icon">🔇</span>
+                        <span class="label">Silenciar</span>
+                    </button>
+                </div>
+                <!-- Video elements will be added dynamically when needed -->
+                <div id="video-container"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Sistema Intercom v1.0</p>
+        </footer>
+    </div>
+
+    <!-- Service worker registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(reg => console.log('Service Worker registered', reg))
+                .catch(err => console.error('Service Worker registration failed:', err));
+        }
+    </script>
+    <script src="app.js"></script>
+</body>
+</html>
