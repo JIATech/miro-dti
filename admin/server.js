@@ -8,6 +8,9 @@ const cron = require('node-cron');
 const Docker = require('dockerode');
 const basicAuth = require('express-basic-auth');
 const os = require('os');
+const cors = require('cors');
+const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
 
 // Configuración
 const PORT = process.env.ADMIN_PORT || 8090;
@@ -15,6 +18,7 @@ const LOG_DIR = path.join(__dirname, 'logs');
 const LOG_RETENTION_DAYS = 7; // Días que se mantienen los logs
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/intercom';
 
 // Asegurar que existe el directorio de logs
 if (!fs.existsSync(LOG_DIR)) {
@@ -42,10 +46,72 @@ const logger = winston.createLogger({
 // Cliente Docker para interactuar con contenedores
 const docker = new Docker();
 
+// Conexión a MongoDB
+mongoose.connect(MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}).then(() => {
+    logger.info('Conexión a MongoDB establecida');
+}).catch(err => {
+    logger.error('Error al conectar a MongoDB:', err);
+});
+
+// Esquema para almacenar datos de tablets
+const tabletSchema = new mongoose.Schema({
+    deviceName: { type: String, required: true, unique: true },
+    deviceType: { type: String, required: true },
+    lastSeen: { type: Date, default: Date.now },
+    totalCalls: { type: Number, default: 0 },
+    callDuration: { type: Number, default: 0 }, // En segundos
+    callsSuccess: { type: Number, default: 0 },
+    callsFailed: { type: Number, default: 0 },
+    batteryLevel: { type: Number },
+    networkType: { type: String },
+    networkStrength: { type: Number },
+    diskSpace: { type: Object },
+    memoryUsage: { type: Object },
+    audioSettings: { type: Object },
+    videoSettings: { type: Object },
+    errors: [{ 
+        timestamp: Date,
+        errorType: String,
+        message: String,
+        details: Object
+    }],
+    logs: [{ 
+        timestamp: Date,
+        level: String, 
+        message: String,
+        details: Object
+    }]
+});
+
+// Limitar la cantidad de logs almacenados
+tabletSchema.pre('save', function(next) {
+    // Mantener solo los últimos 100 logs
+    if (this.logs && this.logs.length > 100) {
+        this.logs = this.logs.slice(-100);
+    }
+    
+    // Mantener solo los últimos 50 errores
+    if (this.errors && this.errors.length > 50) {
+        this.errors = this.errors.slice(-50);
+    }
+    
+    next();
+});
+
+const Tablet = mongoose.model('Tablet', tabletSchema);
+
 // Inicialización de servidor Express
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
+
+// Middleware
+app.use(cors());
+app.use(bodyParser.json({ limit: '5mb' }));
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // Configuración de seguridad
 app.use(basicAuth({
@@ -152,6 +218,229 @@ app.post('/api/actions/clean-logs', async (req, res) => {
         });
         
         res.status(500).json({ error: `Error en la limpieza de logs: ${error.message}` });
+    }
+});
+
+// Rutas públicas (no requieren autenticación)
+app.post('/api/tablet/sync', async (req, res) => {
+    try {
+        const { deviceName, deviceType, data } = req.body;
+        
+        if (!deviceName || !deviceType) {
+            return res.status(400).json({
+                success: false,
+                message: 'Faltan datos requeridos (deviceName, deviceType)'
+            });
+        }
+        
+        // Buscar tablet existente o crear uno nuevo
+        let tablet = await Tablet.findOne({ deviceName });
+        
+        if (!tablet) {
+            tablet = new Tablet({
+                deviceName,
+                deviceType
+            });
+        }
+        
+        // Actualizar estadísticas
+        tablet.lastSeen = new Date();
+        
+        // Actualizar datos si se proporcionan
+        if (data) {
+            if (data.calls) {
+                if (data.calls.total !== undefined) tablet.totalCalls = data.calls.total;
+                if (data.calls.duration !== undefined) tablet.callDuration = data.calls.duration;
+                if (data.calls.success !== undefined) tablet.callsSuccess = data.calls.success;
+                if (data.calls.failed !== undefined) tablet.callsFailed = data.calls.failed;
+            }
+            
+            if (data.device) {
+                if (data.device.batteryLevel !== undefined) tablet.batteryLevel = data.device.batteryLevel;
+                if (data.device.networkType !== undefined) tablet.networkType = data.device.networkType;
+                if (data.device.networkStrength !== undefined) tablet.networkStrength = data.device.networkStrength;
+                if (data.device.diskSpace !== undefined) tablet.diskSpace = data.device.diskSpace;
+                if (data.device.memoryUsage !== undefined) tablet.memoryUsage = data.device.memoryUsage;
+            }
+            
+            if (data.settings) {
+                if (data.settings.audio !== undefined) tablet.audioSettings = data.settings.audio;
+                if (data.settings.video !== undefined) tablet.videoSettings = data.settings.video;
+            }
+            
+            // Añadir nuevos logs si existen
+            if (data.logs && Array.isArray(data.logs) && data.logs.length > 0) {
+                // Añadir solo logs nuevos
+                tablet.logs.push(...data.logs.map(log => ({
+                    timestamp: log.timestamp || new Date(),
+                    level: log.level || 'info',
+                    message: log.message,
+                    details: log.details || {}
+                })));
+            }
+            
+            // Añadir nuevos errores si existen
+            if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+                tablet.errors.push(...data.errors.map(error => ({
+                    timestamp: error.timestamp || new Date(),
+                    errorType: error.errorType || 'unknown',
+                    message: error.message,
+                    details: error.details || {}
+                })));
+            }
+        }
+        
+        // Guardar cambios
+        await tablet.save();
+        
+        // Notificar a clientes conectados por WebSocket
+        io.emit('tablet:update', {
+            deviceName: tablet.deviceName,
+            deviceType: tablet.deviceType,
+            lastSeen: tablet.lastSeen,
+            batteryLevel: tablet.batteryLevel,
+            networkType: tablet.networkType
+        });
+        
+        return res.json({
+            success: true,
+            message: 'Datos sincronizados correctamente'
+        });
+    } catch (error) {
+        logger.error('Error en sincronización de tablet:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al procesar datos',
+            error: error.message
+        });
+    }
+});
+
+// Rutas para dashboard (requieren autenticación)
+app.get('/api/tablets', async (req, res) => {
+    try {
+        const tablets = await Tablet.find({})
+            .select('-logs -errors') // Excluir logs y errores para reducir tamaño
+            .sort({ lastSeen: -1 });
+            
+        return res.json({
+            success: true,
+            count: tablets.length,
+            tablets
+        });
+    } catch (error) {
+        logger.error('Error al obtener tablets:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al obtener datos',
+            error: error.message
+        });
+    }
+});
+
+app.get('/api/tablets/:deviceName', async (req, res) => {
+    try {
+        const { deviceName } = req.params;
+        const tablet = await Tablet.findOne({ deviceName });
+        
+        if (!tablet) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tablet no encontrado'
+            });
+        }
+        
+        return res.json({
+            success: true,
+            tablet
+        });
+    } catch (error) {
+        logger.error('Error al obtener detalles de tablet:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al obtener datos',
+            error: error.message
+        });
+    }
+});
+
+app.get('/api/tablets/:deviceName/logs', async (req, res) => {
+    try {
+        const { deviceName } = req.params;
+        const { limit = 50, level } = req.query;
+        
+        const tablet = await Tablet.findOne({ deviceName });
+        
+        if (!tablet) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tablet no encontrado'
+            });
+        }
+        
+        let logs = tablet.logs;
+        
+        // Filtrar por nivel si se especifica
+        if (level) {
+            logs = logs.filter(log => log.level === level);
+        }
+        
+        // Limitar cantidad de logs
+        logs = logs.slice(-Math.min(parseInt(limit), 100));
+        
+        return res.json({
+            success: true,
+            deviceName,
+            count: logs.length,
+            logs
+        });
+    } catch (error) {
+        logger.error('Error al obtener logs de tablet:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al obtener datos',
+            error: error.message
+        });
+    }
+});
+
+app.get('/api/tablets/:deviceName/errors', async (req, res) => {
+    try {
+        const { deviceName } = req.params;
+        const { limit = 50, type } = req.query;
+        
+        const tablet = await Tablet.findOne({ deviceName });
+        
+        if (!tablet) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tablet no encontrado'
+            });
+        }
+        
+        let errors = tablet.errors;
+        
+        // Filtrar por tipo si se especifica
+        if (type) {
+            errors = errors.filter(error => error.errorType === type);
+        }
+        
+        // Limitar cantidad de errores
+        errors = errors.slice(-Math.min(parseInt(limit), 100));
+        
+        return res.json({
+            success: true,
+            deviceName,
+            count: errors.length,
+            errors
+        });
+    } catch (error) {
+        logger.error('Error al obtener errores de tablet:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al obtener datos',
+            error: error.message
+        });
     }
 });
 

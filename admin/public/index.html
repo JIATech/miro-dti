@@ -1,17 +1,18 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Administración - Sistema Intercom</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <!-- Barra de navegación principal -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
                 <i class="bi bi-headset me-2"></i>Intercom Admin
@@ -22,23 +23,41 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link active" href="#dashboard-tab" data-bs-toggle="tab">Dashboard</a>
+                        <a class="nav-link active" href="#dashboard-tab" data-bs-toggle="tab">
+                            <i class="bi bi-speedometer2 me-1"></i> Dashboard
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#logs-tab" data-bs-toggle="tab">Logs en Vivo</a>
+                        <a class="nav-link" href="#tablets-tab" data-bs-toggle="tab">
+                            <i class="bi bi-tablet me-1"></i> Tablets
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#services-tab" data-bs-toggle="tab">Servicios</a>
+                        <a class="nav-link" href="#logs-tab" data-bs-toggle="tab">
+                            <i class="bi bi-journal-text me-1"></i> Log Central
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#settings-tab" data-bs-toggle="tab">Configuración</a>
+                        <a class="nav-link" href="#services-tab" data-bs-toggle="tab">
+                            <i class="bi bi-hdd-stack me-1"></i> Servicios
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#settings-tab" data-bs-toggle="tab">
+                            <i class="bi bi-gear me-1"></i> Configuración
+                        </a>
                     </li>
                 </ul>
-                <div class="d-flex">
-                    <span class="navbar-text me-3">
-                        <span class="badge bg-success" id="connection-status">Conectado</span>
-                    </span>
-                    <button class="btn btn-outline-light" id="btn-fullscreen">
+                <div class="d-flex align-items-center">
+                    <div class="me-3">
+                        <span class="badge rounded-pill bg-light text-dark" title="Última actualización">
+                            <i class="bi bi-clock"></i> <span id="last-update-time">--:--:--</span>
+                        </span>
+                    </div>
+                    <div class="me-3">
+                        <span id="connection-status" class="badge bg-success">Conectado</span>
+                    </div>
+                    <button class="btn btn-outline-light" id="btn-fullscreen" title="Pantalla completa">
                         <i class="bi bi-arrows-fullscreen"></i>
                     </button>
                 </div>
@@ -46,107 +65,126 @@
         </div>
     </nav>
 
-    <div class="container-fluid">
+    <!-- Contenedor principal -->
+    <div class="container-fluid mt-3 mb-5">
         <div class="tab-content">
             <!-- DASHBOARD -->
             <div class="tab-pane fade show active" id="dashboard-tab">
                 <div class="row my-3">
-                    <div class="col-12">
+                    <div class="col-md-8">
                         <h2>Dashboard</h2>
                     </div>
-                </div>
-                
-                <!-- Resumen -->
-                <div class="row">
-                    <div class="col-md-3 mb-3">
-                        <div class="card text-white bg-primary">
-                            <div class="card-body d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="card-title">Llamadas Totales</h6>
-                                    <h2 class="card-text" id="total-calls">0</h2>
-                                </div>
-                                <i class="bi bi-telephone-fill fs-1"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="card text-white bg-success">
-                            <div class="card-body d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="card-title">Llamadas Exitosas</h6>
-                                    <h2 class="card-text" id="success-calls">0</h2>
-                                </div>
-                                <i class="bi bi-check-circle-fill fs-1"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="card text-white bg-danger">
-                            <div class="card-body d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="card-title">Llamadas Fallidas</h6>
-                                    <h2 class="card-text" id="failed-calls">0</h2>
-                                </div>
-                                <i class="bi bi-x-circle-fill fs-1"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="card text-white bg-warning">
-                            <div class="card-body d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="card-title">Errores Totales</h6>
-                                    <h2 class="card-text" id="total-errors">0</h2>
-                                </div>
-                                <i class="bi bi-exclamation-triangle-fill fs-1"></i>
-                            </div>
-                        </div>
+                    <div class="col-md-4 text-end">
+                        <button class="btn btn-primary" id="refresh-dashboard">
+                            <i class="bi bi-arrow-repeat me-1"></i> Actualizar
+                        </button>
                     </div>
                 </div>
-                
-                <!-- Gráficos -->
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <div class="card">
-                            <div class="card-header">
-                                Llamadas por Hora
-                            </div>
+
+                <!-- Tarjetas de resumen -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-bg-primary h-100">
                             <div class="card-body">
-                                <canvas id="calls-chart" height="200"></canvas>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-title text-white-50">Total de Tablets</h6>
+                                        <h2 class="card-text" id="total-tablets-count">-</h2>
+                                    </div>
+                                    <i class="bi bi-tablet display-4 text-white-50"></i>
+                                </div>
+                            </div>
+                            <div class="card-footer d-flex justify-content-between text-white-50">
+                                <small><span id="tablets-online-count">-</span> en línea</small>
+                                <small><span id="tablets-offline-count">-</span> fuera de línea</small>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="card">
-                            <div class="card-header">
-                                Errores por Tipo
-                            </div>
+                    <div class="col-md-3">
+                        <div class="card text-bg-success h-100">
                             <div class="card-body">
-                                <canvas id="errors-chart" height="200"></canvas>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-title text-white-50">Llamadas Hoy</h6>
+                                        <h2 class="card-text" id="today-calls-count">-</h2>
+                                    </div>
+                                    <i class="bi bi-telephone display-4 text-white-50"></i>
+                                </div>
+                            </div>
+                            <div class="card-footer d-flex justify-content-between text-white-50">
+                                <small><span id="successful-calls-count">-</span> exitosas</small>
+                                <small><span id="missed-calls-count">-</span> perdidas</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-bg-info h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-title text-white-50">Uso del Sistema</h6>
+                                        <h2 class="card-text" id="system-uptime">-</h2>
+                                    </div>
+                                    <i class="bi bi-activity display-4 text-white-50"></i>
+                                </div>
+                            </div>
+                            <div class="card-footer d-flex justify-content-between text-white-50">
+                                <small>Última reinicio: <span id="last-restart-time">--:--</span></small>
+                                <small><span id="health-status">Normal</span></small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-bg-warning h-100">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="card-title text-white-50">Alertas</h6>
+                                        <h2 class="card-text" id="alerts-count">-</h2>
+                                    </div>
+                                    <i class="bi bi-exclamation-triangle display-4 text-white-50"></i>
+                                </div>
+                            </div>
+                            <div class="card-footer d-flex justify-content-between text-white-50">
+                                <small><span id="errors-count">-</span> errores</small>
+                                <small><span id="warnings-count">-</span> advertencias</small>
                             </div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Estado del Sistema -->
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <div class="card">
-                            <div class="card-header">
-                                Estado de Servicios
+
+                <!-- Gráficos y Tablas -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Actividad de Llamadas (últimas 24h)</span>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-secondary active" data-chart-period="day">Día</button>
+                                    <button class="btn btn-outline-secondary" data-chart-period="week">Semana</button>
+                                    <button class="btn btn-outline-secondary" data-chart-period="month">Mes</button>
+                                </div>
                             </div>
                             <div class="card-body">
-                                <div id="services-status" class="table-responsive">
-                                    <table class="table table-hover">
+                                <canvas id="calls-chart" height="250"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header">Estado de los Servicios</div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
                                         <thead>
                                             <tr>
                                                 <th>Servicio</th>
                                                 <th>Estado</th>
                                                 <th>Tiempo Activo</th>
-                                                <th>Acciones</th>
+                                                <th>Última Verificación</th>
                                             </tr>
                                         </thead>
-                                        <tbody>
+                                        <tbody id="services-status-table">
                                             <tr>
                                                 <td colspan="4" class="text-center">Cargando...</td>
                                             </tr>
@@ -156,14 +194,35 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6 mb-3">
+                </div>
+
+                <!-- Actividad Reciente -->
+                <div class="row">
+                    <div class="col-md-12">
                         <div class="card">
-                            <div class="card-header">
-                                Eventos del Sistema
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <span>Actividad Reciente</span>
+                                <button class="btn btn-sm btn-outline-secondary" id="clear-recent-activity">
+                                    <i class="bi bi-trash me-1"></i> Limpiar
+                                </button>
                             </div>
-                            <div class="card-body">
-                                <div id="system-events" class="log-container">
-                                    <div class="log-line">Sistema inicializado</div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Timestamp</th>
+                                                <th>Tablet</th>
+                                                <th>Evento</th>
+                                                <th>Detalles</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="recent-activity-table">
+                                            <tr>
+                                                <td colspan="4" class="text-center">No hay actividad reciente</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
@@ -171,86 +230,281 @@
                 </div>
             </div>
             
-            <!-- LOGS EN VIVO -->
-            <div class="tab-pane fade" id="logs-tab">
+            <!-- TABLETS -->
+            <div class="tab-pane fade" id="tablets-tab">
                 <div class="row my-3">
                     <div class="col-md-8">
-                        <h2>Logs en Tiempo Real</h2>
+                        <h2>Monitoreo de Tablets</h2>
                     </div>
                     <div class="col-md-4 text-end">
                         <div class="btn-group">
-                            <button id="pause-logs" class="btn btn-secondary">
-                                <i class="bi bi-pause-fill"></i> Pausar
+                            <button class="btn btn-primary" id="refresh-tablets">
+                                <i class="bi bi-arrow-repeat me-1"></i> Actualizar
                             </button>
-                            <button id="clear-logs" class="btn btn-danger">
-                                <i class="bi bi-trash"></i> Limpiar Vista
+                            <button class="btn btn-outline-secondary" id="group-tablets-view">
+                                <i class="bi bi-grid me-1"></i> Vista Cuadrícula
+                            </button>
+                            <button class="btn btn-outline-secondary active" id="list-tablets-view">
+                                <i class="bi bi-list-ul me-1"></i> Vista Lista
                             </button>
                         </div>
                     </div>
                 </div>
-                
+
+                <!-- Filtros -->
                 <div class="row mb-3">
-                    <div class="col-12">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row g-2">
+                                    <div class="col-md-3">
+                                        <select class="form-select" id="filter-tablet-role">
+                                            <option value="">Todos los roles</option>
+                                            <option value="portero">Portero</option>
+                                            <option value="administracion">Administración</option>
+                                            <option value="sistemas">Sistemas</option>
+                                            <option value="infraestructura">Infraestructura</option>
+                                            <option value="soporte">Soporte</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <select class="form-select" id="filter-tablet-status">
+                                            <option value="">Todos los estados</option>
+                                            <option value="online">En línea</option>
+                                            <option value="offline">Fuera de línea</option>
+                                            <option value="error">Con errores</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <input type="text" class="form-control" id="filter-tablet-search" placeholder="Buscar tablet...">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button class="btn btn-secondary w-100" id="clear-tablet-filters">
+                                            <i class="bi bi-x-circle me-1"></i> Limpiar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tablets (Lista) -->
+                <div id="tablets-list-view">
+                    <div class="card">
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Dispositivo</th>
+                                            <th>Rol</th>
+                                            <th>Estado</th>
+                                            <th>Versión</th>
+                                            <th>Última Conexión</th>
+                                            <th>Última Llamada</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tablets-table">
+                                        <tr>
+                                            <td colspan="7" class="text-center">Cargando tablets...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tablets (Cuadrícula) -->
+                <div id="tablets-grid-view" style="display: none;">
+                    <div class="row" id="tablets-grid-container">
+                        <div class="col-12 text-center py-5">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pestañas de tablets individuales -->
+                <div class="mt-4">
+                    <nav>
+                        <div class="nav nav-tabs" id="tablet-individual-tabs" role="tablist">
+                            <button class="nav-link active" id="tablet-all-tab" data-bs-toggle="tab" data-bs-target="#tablet-all-content" type="button" role="tab">
+                                Todas las Tablets
+                            </button>
+                            <!-- Las pestañas individuales se añadirán dinámicamente con JavaScript -->
+                        </div>
+                    </nav>
+                    <div class="tab-content border border-top-0 p-3" id="tablet-individual-content">
+                        <div class="tab-pane fade show active" id="tablet-all-content" role="tabpanel">
+                            <p class="lead">Selecciona una tablet específica en la tabla o cuadrícula anterior para mostrar su pestaña individual con información detallada.</p>
+                            <p>En las pestañas individuales podrás ver:</p>
+                            <ul>
+                                <li>Información detallada del hardware</li>
+                                <li>Gráficos de rendimiento</li>
+                                <li>Historial de llamadas</li>
+                                <li>Logs específicos de la tablet</li>
+                            </ul>
+                        </div>
+                        <!-- El contenido de pestañas individuales se añadirá dinámicamente con JavaScript -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- LOG CENTRAL -->
+            <div class="tab-pane fade" id="logs-tab">
+                <div class="row my-3">
+                    <div class="col-md-8">
+                        <h2>Log Central</h2>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div class="btn-group">
+                            <button class="btn btn-primary" id="refresh-logs">
+                                <i class="bi bi-arrow-repeat me-1"></i> Actualizar
+                            </button>
+                            <button class="btn btn-outline-danger" id="clear-logs">
+                                <i class="bi bi-trash me-1"></i> Limpiar
+                            </button>
+                            <button class="btn btn-outline-secondary" id="export-logs">
+                                <i class="bi bi-download me-1"></i> Exportar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filtros de logs -->
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row g-2">
+                                    <div class="col-md-2">
+                                        <select class="form-select" id="filter-log-source">
+                                            <option value="">Todas las fuentes</option>
+                                            <option value="tablet">Tablets</option>
+                                            <option value="server">Servidor</option>
+                                            <option value="signaling">Señalización</option>
+                                            <option value="mirotalk">MiroTalk</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <select class="form-select" id="filter-log-level">
+                                            <option value="">Todos los niveles</option>
+                                            <option value="info">Info</option>
+                                            <option value="warning">Warning</option>
+                                            <option value="error">Error</option>
+                                            <option value="debug">Debug</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <select class="form-select" id="filter-log-tablet">
+                                            <option value="">Todas las tablets</option>
+                                            <!-- Opciones de tablets se cargarán dinámicamente -->
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <input type="text" class="form-control" id="filter-log-search" placeholder="Buscar...">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="input-group">
+                                            <span class="input-group-text">Líneas</span>
+                                            <input type="number" class="form-control" id="log-line-limit" value="100" min="10" max="1000">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-1">
+                                        <button class="btn btn-secondary w-100" id="clear-log-filters">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contenedor de logs principal -->
+                <div class="row">
+                    <div class="col-md-12">
                         <div class="card">
                             <div class="card-header">
-                                <ul class="nav nav-tabs card-header-tabs" id="log-tabs" role="tablist">
+                                <ul class="nav nav-tabs card-header-tabs" id="log-category-tabs" role="tablist">
                                     <li class="nav-item" role="presentation">
-                                        <a class="nav-link active" id="all-logs-tab" data-bs-toggle="tab" href="#all-logs" role="tab">Todos</a>
+                                        <button class="nav-link active" id="all-logs-tab" data-bs-toggle="tab" data-bs-target="#all-logs-content" type="button" role="tab">
+                                            <i class="bi bi-grid-3x3 me-1"></i> Todos
+                                        </button>
                                     </li>
                                     <li class="nav-item" role="presentation">
-                                        <a class="nav-link" id="pwa-logs-tab" data-bs-toggle="tab" href="#pwa-logs" role="tab">PWA</a>
+                                        <button class="nav-link" id="system-logs-tab" data-bs-toggle="tab" data-bs-target="#system-logs-content" type="button" role="tab">
+                                            <i class="bi bi-hdd-stack me-1"></i> Sistema
+                                        </button>
                                     </li>
                                     <li class="nav-item" role="presentation">
-                                        <a class="nav-link" id="signaling-logs-tab" data-bs-toggle="tab" href="#signaling-logs" role="tab">Señalización</a>
+                                        <button class="nav-link" id="call-logs-tab" data-bs-toggle="tab" data-bs-target="#call-logs-content" type="button" role="tab">
+                                            <i class="bi bi-telephone me-1"></i> Llamadas
+                                        </button>
                                     </li>
                                     <li class="nav-item" role="presentation">
-                                        <a class="nav-link" id="mirotalksfu-logs-tab" data-bs-toggle="tab" href="#mirotalksfu-logs" role="tab">MiroTalkSFU</a>
+                                        <button class="nav-link" id="error-logs-tab" data-bs-toggle="tab" data-bs-target="#error-logs-content" type="button" role="tab">
+                                            <i class="bi bi-exclamation-triangle me-1"></i> Errores
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="performance-logs-tab" data-bs-toggle="tab" data-bs-target="#performance-logs-content" type="button" role="tab">
+                                            <i class="bi bi-activity me-1"></i> Rendimiento
+                                        </button>
                                     </li>
                                 </ul>
                             </div>
-                            <div class="card-body">
+                            <div class="card-body p-0">
                                 <div class="tab-content">
-                                    <div class="tab-pane fade show active" id="all-logs" role="tabpanel">
-                                        <div class="log-container" id="all-logs-container">
-                                            <div class="text-center text-muted">Esperando logs...</div>
+                                    <div class="tab-pane fade show active" id="all-logs-content" role="tabpanel">
+                                        <div class="logs-container p-2" style="height: 600px; overflow-y: auto; font-family: monospace;">
+                                            <div id="all-logs-content-wrapper"></div>
                                         </div>
                                     </div>
-                                    <div class="tab-pane fade" id="pwa-logs" role="tabpanel">
-                                        <div class="log-container" id="pwa-logs-container">
-                                            <div class="text-center text-muted">Esperando logs...</div>
+                                    <div class="tab-pane fade" id="system-logs-content" role="tabpanel">
+                                        <div class="logs-container p-2" style="height: 600px; overflow-y: auto; font-family: monospace;">
+                                            <div id="system-logs-content-wrapper"></div>
                                         </div>
                                     </div>
-                                    <div class="tab-pane fade" id="signaling-logs" role="tabpanel">
-                                        <div class="log-container" id="signaling-logs-container">
-                                            <div class="text-center text-muted">Esperando logs...</div>
+                                    <div class="tab-pane fade" id="call-logs-content" role="tabpanel">
+                                        <div class="logs-container p-2" style="height: 600px; overflow-y: auto; font-family: monospace;">
+                                            <div id="call-logs-content-wrapper"></div>
                                         </div>
                                     </div>
-                                    <div class="tab-pane fade" id="mirotalksfu-logs" role="tabpanel">
-                                        <div class="log-container" id="mirotalksfu-logs-container">
-                                            <div class="text-center text-muted">Esperando logs...</div>
+                                    <div class="tab-pane fade" id="error-logs-content" role="tabpanel">
+                                        <div class="logs-container p-2" style="height: 600px; overflow-y: auto; font-family: monospace;">
+                                            <div id="error-logs-content-wrapper"></div>
+                                        </div>
+                                    </div>
+                                    <div class="tab-pane fade" id="performance-logs-content" role="tabpanel">
+                                        <div class="logs-container p-2" style="height: 600px; overflow-y: auto; font-family: monospace;">
+                                            <div id="performance-logs-content-wrapper"></div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="card-footer">
-                                <div class="row align-items-center">
-                                    <div class="col-auto">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="auto-scroll" checked>
-                                            <label class="form-check-label" for="auto-scroll">Auto-scroll</label>
-                                        </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Estadísticas de Logs -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">Análisis de Logs</div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h5>Distribución por Nivel</h5>
+                                        <canvas id="log-level-chart" height="200"></canvas>
                                     </div>
-                                    <div class="col-auto">
-                                        <div class="form-check form-switch">
-                                            <input class="form-check-input" type="checkbox" id="show-timestamps" checked>
-                                            <label class="form-check-label" for="show-timestamps">Mostrar timestamps</label>
-                                        </div>
-                                    </div>
-                                    <div class="col">
-                                        <div class="input-group">
-                                            <input type="text" class="form-control" id="log-filter" placeholder="Filtrar logs...">
-                                            <button class="btn btn-outline-secondary" type="button" id="apply-filter">Filtrar</button>
-                                        </div>
+                                    <div class="col-md-6">
+                                        <h5>Distribución por Fuente</h5>
+                                        <canvas id="log-source-chart" height="200"></canvas>
                                     </div>
                                 </div>
                             </div>
@@ -262,139 +516,109 @@
             <!-- SERVICIOS -->
             <div class="tab-pane fade" id="services-tab">
                 <div class="row my-3">
-                    <div class="col-12">
+                    <div class="col-md-8">
                         <h2>Gestión de Servicios</h2>
                     </div>
+                    <div class="col-md-4 text-end">
+                        <button id="refresh-services" class="btn btn-outline-primary">
+                            <i class="bi bi-arrow-clockwise"></i> Actualizar
+                        </button>
+                    </div>
                 </div>
-                
-                <div class="row">
-                    <div class="col-md-4 mb-3">
+                <div class="row mb-3">
+                    <div class="col-12">
                         <div class="card">
-                            <div class="card-header">PWA</div>
-                            <div class="card-body">
-                                <h5 class="card-title"><span id="pwa-status" class="badge bg-secondary">Desconocido</span></h5>
-                                <p class="card-text">Interfaz web para los usuarios. Maneja la interacción y la lógica básica de la aplicación.</p>
-                                <div class="d-grid gap-2">
-                                    <button class="btn btn-primary" data-service="pwa" data-action="restart">
-                                        <i class="bi bi-arrow-repeat"></i> Reiniciar Servicio
-                                    </button>
-                                    <a href="http://localhost:80" target="_blank" class="btn btn-outline-primary">
-                                        <i class="bi bi-box-arrow-up-right"></i> Abrir en Nueva Pestaña
-                                    </a>
-                                </div>
+                            <div class="card-header">
+                                <h5>Estado de Servicios</h5>
                             </div>
-                            <div class="card-footer text-muted" id="pwa-uptime">
-                                Tiempo activo: --
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Servicio</th>
+                                                <th>Estado</th>
+                                                <th>Tiempo Activo</th>
+                                                <th>Memoria</th>
+                                                <th>CPU</th>
+                                                <th>Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="services-table">
+                                            <tr>
+                                                <td colspan="6" class="text-center">
+                                                    <div class="spinner-border text-primary" role="status">
+                                                        <span class="visually-hidden">Cargando...</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="col-md-4 mb-3">
+                </div>
+                <div class="row mb-3">
+                    <div class="col-12">
                         <div class="card">
-                            <div class="card-header">Servidor de Señalización</div>
+                            <div class="card-header">
+                                <h5>Logs de Servicios</h5>
+                            </div>
                             <div class="card-body">
-                                <h5 class="card-title"><span id="signaling-status" class="badge bg-secondary">Desconocido</span></h5>
-                                <p class="card-text">Coordina las llamadas entre dispositivos y gestiona el estado de la comunicación.</p>
-                                <div class="d-grid gap-2">
-                                    <button class="btn btn-primary" data-service="signaling" data-action="restart">
-                                        <i class="bi bi-arrow-repeat"></i> Reiniciar Servicio
-                                    </button>
-                                    <a href="http://localhost:3000/health" target="_blank" class="btn btn-outline-primary">
-                                        <i class="bi bi-activity"></i> Comprobar Estado
-                                    </a>
+                                <div id="service-logs" class="logs-container">
+                                    <div class="text-muted">Selecciona un servicio para ver sus logs</div>
                                 </div>
-                            </div>
-                            <div class="card-footer text-muted" id="signaling-uptime">
-                                Tiempo activo: --
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-4 mb-3">
-                        <div class="card">
-                            <div class="card-header">MiroTalkSFU</div>
-                            <div class="card-body">
-                                <h5 class="card-title"><span id="mirotalksfu-status" class="badge bg-secondary">Desconocido</span></h5>
-                                <p class="card-text">Servidor WebRTC que maneja las conexiones de video y audio para las llamadas.</p>
-                                <div class="d-grid gap-2">
-                                    <button class="btn btn-primary" data-service="mirotalksfu" data-action="restart">
-                                        <i class="bi bi-arrow-repeat"></i> Reiniciar Servicio
-                                    </button>
-                                    <a href="http://localhost:8080" target="_blank" class="btn btn-outline-primary">
-                                        <i class="bi bi-box-arrow-up-right"></i> Abrir en Nueva Pestaña
-                                    </a>
-                                </div>
-                            </div>
-                            <div class="card-footer text-muted" id="mirotalksfu-uptime">
-                                Tiempo activo: --
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- CONFIGURACIÓN -->
             <div class="tab-pane fade" id="settings-tab">
                 <div class="row my-3">
                     <div class="col-12">
                         <h2>Configuración del Sistema</h2>
                     </div>
                 </div>
-                
-                <div class="row">
-                    <div class="col-md-6 mb-3">
+                <div class="row mb-3">
+                    <div class="col-md-6">
                         <div class="card">
-                            <div class="card-header">Administración de Logs</div>
+                            <div class="card-header">
+                                <h5>Configuración General</h5>
+                            </div>
                             <div class="card-body">
-                                <div class="mb-3">
-                                    <label class="form-label">Rotación de Logs</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">Conservar</span>
-                                        <input type="number" id="log-retention" class="form-control" value="7" min="1" max="30">
-                                        <span class="input-group-text">días</span>
+                                <form id="general-settings-form">
+                                    <div class="mb-3">
+                                        <label for="log-retention" class="form-label">Retención de Logs (días)</label>
+                                        <input type="number" class="form-control" id="log-retention" min="1" value="7">
                                     </div>
-                                    <div class="form-text">Los logs más antiguos serán eliminados automáticamente.</div>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">Próxima Limpieza Programada</label>
-                                    <input type="text" id="next-cleanup" class="form-control" readonly>
-                                </div>
-                                
-                                <button id="btn-clean-logs" class="btn btn-warning">
-                                    <i class="bi bi-trash"></i> Iniciar Limpieza Manual
-                                </button>
+                                    <div class="mb-3">
+                                        <label for="auto-refresh" class="form-label">Actualización automática (segundos)</label>
+                                        <input type="number" class="form-control" id="auto-refresh" min="5" value="30">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+                                </form>
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-6">
                         <div class="card">
-                            <div class="card-header">Información del Sistema</div>
+                            <div class="card-header">
+                                <h5>Configuración de Tablets</h5>
+                            </div>
                             <div class="card-body">
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Tiempo Activo del Servidor</label>
-                                            <input type="text" id="server-uptime" class="form-control" readonly>
-                                        </div>
+                                <form id="tablets-settings-form">
+                                    <div class="mb-3">
+                                        <label for="sync-interval" class="form-label">Intervalo de Sincronización (minutos)</label>
+                                        <input type="number" class="form-control" id="sync-interval" min="5" value="30">
                                     </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Memoria Utilizada</label>
-                                            <input type="text" id="memory-usage" class="form-control" readonly>
-                                        </div>
+                                    <div class="mb-3">
+                                        <label for="tablet-log-retention" class="form-label">Retención de Logs en Tablets (días)</label>
+                                        <input type="number" class="form-control" id="tablet-log-retention" min="1" value="7">
                                     </div>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">Estado de los Servicios</label>
-                                    <ul class="list-group" id="services-health-list">
-                                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                                            Cargando información de servicios...
-                                        </li>
-                                    </ul>
-                                </div>
+                                    <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+                                </form>
                             </div>
                         </div>
                     </div>
@@ -408,35 +632,139 @@
         <div id="notification-toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="toast-header">
                 <strong class="me-auto" id="toast-title">Notificación</strong>
-                <small id="toast-time">Ahora</small>
                 <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
-            <div class="toast-body" id="toast-body">
+            <div class="toast-body" id="toast-message">
                 Mensaje de notificación
             </div>
         </div>
     </div>
 
     <!-- Modal de confirmación -->
-    <div class="modal fade" id="confirm-modal" tabindex="-1">
+    <div class="modal fade" id="confirm-modal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="confirm-title">Confirmar Acción</h5>
+                    <h5 class="modal-title" id="confirm-modal-title">Confirmar acción</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body" id="confirm-message">
+                <div class="modal-body" id="confirm-modal-body">
                     ¿Está seguro de que desea realizar esta acción?
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" id="confirm-btn">Confirmar</button>
+                    <button type="button" class="btn btn-primary" id="confirm-action">Confirmar</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Modal de detalles de tablet -->
+    <div class="modal fade" id="tablet-details-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="tablet-details-title">Detalles de Tablet</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    Información Básica
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>ID:</strong> <span id="tablet-details-id">--</span></p>
+                                    <p><strong>Rol:</strong> <span id="tablet-details-role">--</span></p>
+                                    <p><strong>Estado:</strong> <span id="tablet-details-status" class="badge bg-secondary">--</span></p>
+                                    <p><strong>IP:</strong> <span id="tablet-details-ip">--</span></p>
+                                    <p><strong>Versión:</strong> <span id="tablet-details-version">--</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card mb-3" id="tablet-details-hw-info">
+                                <div class="card-header">
+                                    Hardware
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Modelo:</strong> <span id="tablet-details-device-model">--</span></p>
+                                    <p><strong>Sistema:</strong> <span id="tablet-details-os-version">--</span></p>
+                                    <p><strong>Pantalla:</strong> <span id="tablet-details-screen">--</span></p>
+                                    <p><strong>Almacenamiento:</strong> <span id="tablet-details-storage">--</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3" id="tablet-details-perf-info">
+                                <div class="card-header">
+                                    Rendimiento
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>CPU:</strong> <span id="tablet-details-cpu">--</span></p>
+                                    <p><strong>Memoria:</strong> <span id="tablet-details-memory">--</span></p>
+                                    <p><strong>Batería:</strong> <span id="tablet-details-battery">--</span></p>
+                                    <p><strong>Red:</strong> <span id="tablet-details-network">--</span></p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    Estadísticas
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Total llamadas:</strong> <span id="tablet-details-calls">--</span></p>
+                                    <p><strong>Tiempo conectado:</strong> <span id="tablet-details-connected">--</span></p>
+                                    <p><strong>Última llamada:</strong> <span id="tablet-details-last-call">--</span></p>
+                                    <p><strong>Errores registrados:</strong> <span id="tablet-details-errors">--</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <span>Logs específicos de esta tablet</span>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-secondary" id="tablet-logs-refresh">
+                                            <i class="bi bi-arrow-clockwise"></i> Actualizar
+                                        </button>
+                                        <button class="btn btn-outline-danger" id="tablet-logs-clear">
+                                            <i class="bi bi-trash"></i> Limpiar
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body p-2">
+                                    <div id="tablet-specific-logs" class="logs-container" style="height: 200px; overflow-y: auto;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="btn-group me-auto">
+                        <button type="button" class="btn btn-outline-primary" id="tablet-action-ping">
+                            <i class="bi bi-arrow-repeat me-1"></i> Ping
+                        </button>
+                        <button type="button" class="btn btn-outline-warning" id="tablet-action-restart">
+                            <i class="bi bi-arrow-clockwise me-1"></i> Reiniciar
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" id="tablet-action-reset">
+                            <i class="bi bi-x-octagon me-1"></i> Reset
+                        </button>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>
