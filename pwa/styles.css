@@ -3,6 +3,13 @@
     box-sizing: border-box;
     margin: 0;
     padding: 0;
+    user-select: none; /* Prevenir selección de texto para modo kiosco */
+}
+
+html {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
 }
 
 body {
@@ -10,8 +17,29 @@ body {
     background-color: #f0f2f5;
     color: #333;
     line-height: 1.6;
-    height: 100vh;
+    height: 100%;
+    width: 100%;
     overflow: hidden;
+    position: fixed; /* Prevenir scroll/bounce en dispositivos táctiles */
+    touch-action: manipulation; /* Mejora la respuesta táctil */
+}
+
+.landscape-mode {
+    min-height: 100%;
+    width: 100%;
+}
+
+/* Rotación forzada para landscape */
+@media screen and (orientation: portrait) {
+    .landscape-mode .container {
+        transform: rotate(-90deg);
+        transform-origin: left top;
+        width: 100vh;
+        height: 100vw;
+        position: absolute;
+        top: 100%;
+        left: 0;
+    }
 }
 
 .container {
@@ -28,7 +56,6 @@ header {
     padding: 1rem;
     text-align: center;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    position: relative;
 }
 
 header h1 {
@@ -36,95 +63,124 @@ header h1 {
     font-size: 1.8rem;
 }
 
-.role-selector {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
+#login-form {
     display: flex;
+    justify-content: center;
     align-items: center;
-    gap: 0.5rem;
+    gap: 10px;
+    margin-top: 10px;
 }
 
-.role-selector select {
-    padding: 0.3rem;
-    border-radius: 4px;
-    border: 1px solid #ccc;
+#login-form select {
+    padding: 10px;
+    font-size: 1.2rem;
+    border-radius: 8px;
+    border: none;
+    background-color: white;
+    color: #333;
+    width: 60%;
+    max-width: 300px;
+}
+
+#login-btn {
+    padding: 10px 20px;
+    font-size: 1.2rem;
+    border-radius: 8px;
+    border: none;
+    background-color: #009688;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#login-btn:hover {
+    background-color: #00796b;
 }
 
 /* Main content area */
 main {
     flex: 1;
     padding: 1rem;
-    overflow-y: auto;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-}
-
-/* Interface containers */
-.role-interface {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-}
-
-.role-interface h2 {
-    text-align: center;
-    margin-bottom: 1.5rem;
-    color: #444;
-}
-
-/* Button grid */
-.buttons-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 1.5rem;
-    padding: 1rem;
     justify-content: center;
-    flex: 1;
+    align-items: center;
 }
 
-@media (min-width: 768px) {
-    .buttons-grid {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    }
+/* Contenedor principal de botones */
+#main-interface {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
-/* Call buttons */
+.department-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #2196f3;
+    margin-bottom: 30px;
+    text-align: center;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.buttons-container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 25px;
+    width: 90%;
+    max-width: 800px;
+    justify-content: center;
+}
+
 .call-button {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background-color: #ffffff;
+    padding: 1.5rem;
+    border-radius: 15px;
+    background-color: #2196f3;
+    color: white;
+    font-size: 1.5rem;
     border: none;
-    border-radius: 8px;
-    padding: 1.5rem 1rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
     cursor: pointer;
-    min-height: 150px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    height: 150px;
 }
 
 .call-button:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-    background-color: #f9f9f9;
+    background-color: #1976d2;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
 }
 
 .call-button:active {
-    transform: translateY(0);
-    background-color: #e3f2fd;
+    transform: translateY(1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.call-button .icon {
-    font-size: 2.5rem;
-    margin-bottom: 0.8rem;
+.button-icon {
+    font-size: 3rem;
+    margin-bottom: 10px;
 }
 
-.call-button .label {
+.button-label {
     font-size: 1.2rem;
-    font-weight: 500;
-    text-align: center;
+    font-weight: 600;
+}
+
+/* Para tablets más grandes, mostrar botones más grandes */
+@media (min-width: 768px) {
+    .buttons-container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 30px;
+    }
 }
 
 /* Call interface */
@@ -134,7 +190,7 @@ main {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(33, 150, 243, 0.9);
+    background-color: rgba(33, 150, 243, 0.95);
     z-index: 1000;
     display: flex;
     flex-direction: column;
@@ -158,6 +214,40 @@ main {
     margin: 2rem 0;
 }
 
+/* Indicador de calidad de conexión */
+.connection-quality {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.quality-indicator {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: #888; /* Color por defecto (desconocido) */
+}
+
+.quality-indicator.low {
+    background-color: #ff5252; /* Rojo para conexión baja */
+}
+
+.quality-indicator.medium {
+    background-color: #ffb74d; /* Naranja para conexión media */
+}
+
+.quality-indicator.high {
+    background-color: #4caf50; /* Verde para conexión buena */
+}
+
+.quality-text {
+    font-size: 1rem;
+    color: white;
+}
+
 .call-controls {
     display: flex;
     justify-content: center;
@@ -169,6 +259,7 @@ main {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     background: none;
     border: none;
     color: white;
@@ -185,33 +276,88 @@ main {
 
 .action-button.hangup {
     background-color: #f44336;
-    height: 80px;
-    width: 80px;
+    height: 100px;
+    width: 100px;
 }
 
 .action-button.mute {
     background-color: rgba(255, 255, 255, 0.2);
-    height: 80px;
-    width: 80px;
+    height: 100px;
+    width: 100px;
 }
 
 .action-button:hover {
     transform: scale(1.1);
 }
 
-#video-container {
+/* Control de volumen */
+.volume-control {
     display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 1rem;
+    flex-direction: column;
+    align-items: center;
+    color: white;
+    margin: 0 10px;
+    min-width: 120px;
 }
 
-/* Footer */
+.volume-control label {
+    margin-bottom: 5px;
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+.volume-control input[type="range"] {
+    width: 100%;
+    height: 15px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.volume-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+.volume-control input[type="range"]::-moz-range-thumb {
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background: white;
+    border: none;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+/* Video container */
+#video-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+}
+
+#video-container video {
+    border-radius: 8px;
+    max-width: 100%;
+    height: auto;
+    object-fit: cover;
+}
+
+/* Footer styles */
 footer {
     background-color: #2196f3;
     color: white;
     text-align: center;
-    padding: 0.8rem;
+    padding: 0.5rem;
     font-size: 0.9rem;
 }
 
@@ -220,24 +366,30 @@ footer {
     display: none !important;
 }
 
-/* Fullscreen and kiosk mode styles */
-.kiosk-mode {
+/* Estilos para la pantalla de carga (spinner) */
+.loading-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
+    background-color: rgba(255, 255, 255, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
     z-index: 9999;
-    background-color: #fff;
 }
 
-/* Animation for call buttons */
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
+.spinner {
+    width: 60px;
+    height: 60px;
+    border: 6px solid #f3f3f3;
+    border-top: 6px solid #2196f3;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
 }
 
-.pulse {
-    animation: pulse 1.5s infinite;
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
