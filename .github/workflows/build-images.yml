@@ -14,6 +14,24 @@ jobs:
         with:
           fetch-depth: 0
       
+      # Verificar y corregir el directorio mirotalksfu
+      - name: Check mirotalksfu directory
+        run: |
+          echo "Verificando directorio mirotalksfu..."
+          if [ ! -d "mirotalksfu" ]; then
+            echo "El directorio mirotalksfu no existe, clonando desde el repositorio..."
+            git clone https://github.com/miroslavpejic85/mirotalksfu.git mirotalksfu
+          fi
+          
+          echo "Verificando Dockerfile en mirotalksfu..."
+          if [ ! -f "mirotalksfu/Dockerfile" ]; then
+            echo "ERROR: No se encontró Dockerfile en mirotalksfu"
+            exit 1
+          fi
+          
+          echo "Contenido del directorio mirotalksfu:"
+          ls -la mirotalksfu/
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
       
@@ -51,9 +69,23 @@ jobs:
       - name: Prepare MiroTalkSFU Dockerfile
         run: |
           cd mirotalksfu
-          # Crear un Dockerfile.github temporal modificado que maneje el error de GID 1000
-          sed 's/groupadd -r mirotalk -g 1000/getent group mirotalk || groupadd -r mirotalk || groupadd -r mirotalk/' Dockerfile > Dockerfile.github
-          sed -i 's/useradd -u 1000 -r -g mirotalk/getent passwd mirotalk || useradd -r -g mirotalk || useradd -r -g mirotalk/' Dockerfile.github
+          echo "Creando Dockerfile.github con modificaciones..."
+          
+          # Verificar patrones a reemplazar
+          if grep -q "groupadd -r mirotalk -g 1000" Dockerfile; then
+            echo "Modificando patrón de creación de grupo..."
+            sed 's/groupadd -r mirotalk -g 1000/getent group mirotalk || groupadd -r mirotalk || groupadd -r mirotalk/' Dockerfile > Dockerfile.github
+          else
+            echo "Patrón de grupo no encontrado, copiando archivo original..."
+            cp Dockerfile Dockerfile.github
+          fi
+          
+          if grep -q "useradd -u 1000 -r -g mirotalk" Dockerfile.github; then
+            echo "Modificando patrón de creación de usuario..."
+            sed -i 's/useradd -u 1000 -r -g mirotalk/getent passwd mirotalk || useradd -r -g mirotalk || useradd -r -g mirotalk/' Dockerfile.github
+          fi
+          
+          echo "Contenido del Dockerfile.github:"
           cat Dockerfile.github
       
       # Construir y publicar MiroTalkSFU con el Dockerfile modificado
