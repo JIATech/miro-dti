@@ -8,12 +8,20 @@ LABEL description="DTI Intercom Admin Panel"
 # Crear directorio de la aplicación
 WORKDIR /app
 
-# Copiar archivos de dependencias primero para aprovechar la caché de Docker
-COPY package*.json ./
+# Crear package.json vacío si no existe
+RUN echo '{"name":"admin","version":"1.0.0","private":true}' > default-package.json
 
-# Instalar dependencias usando npm ci para una instalación determinista
-RUN npm ci --only=production && \
-    # Limpiar caché npm para reducir el tamaño de la imagen
+# Copiar archivos de dependencias si existen, o usar los predeterminados
+COPY package.json* ./
+COPY package-lock.json* ./
+RUN if [ ! -s package.json ]; then cp default-package.json package.json; fi
+
+# Instalar dependencias con fallback a instalación simple si fallan los archivos de dependencias
+RUN if [ -f package-lock.json ] && [ -s package-lock.json ]; then \
+      npm ci --only=production || npm install --only=production; \
+    else \
+      npm install --only=production; \
+    fi && \
     npm cache clean --force
 
 # Crear directorio de logs y garantizar permisos
