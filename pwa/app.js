@@ -5,7 +5,7 @@
  * using MiroTalkSFU for WebRTC communication
  */
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // DOM Elements
     const roleSelector = document.getElementById('role');
     const porteroInterface = document.getElementById('portero-interface');
@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const callTargetEl = document.getElementById('call-target');
     const hangupBtn = document.getElementById('hangup-btn');
     const muteBtn = document.getElementById('mute-btn');
+    const callLogContainer = document.getElementById('call-log');
     
     // Socket.IO para comunicación con el servidor de señalización
     let socket;
@@ -22,8 +23,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Configuración del sistema
     const config = {
         signalingServer: 'http://localhost:3000',
+        adminServer: 'http://localhost:8090',
+        pwaServer: 'http://localhost:8000', // Servidor para la PWA que maneja API para admin
         mirotalksfu: {
-            url: 'http://localhost:8080',
+            local: {
+                enabled: true,
+                url: 'http://localhost:8080',
+                timeout: 5000,
+                retries: 3
+            },
+            fallback: {
+                enabled: true,
+                url: 'https://fallback-server.example.com:8080', // Cambiar en producción
+                timeout: 5000
+            },
+            currentServer: 'local', // 'local' o 'fallback'
             params: {
                 audio: true,
                 video: true,
@@ -49,11 +63,29 @@ document.addEventListener('DOMContentLoaded', () => {
         muted: false,
         currentRoom: null,
         isRegistered: false,
-        incomingCall: null
+        incomingCall: null,
+        deviceId: generateDeviceId()
     };
 
     // Initialize app
-    function init() {
+    async function init() {
+        // Inicializar almacenamiento local
+        await IntercomDB.initDB();
+        console.log('Base de datos local inicializada');
+        
+        // Inicializar sincronización con panel de administración
+        const syncConfig = await IntercomSync.init();
+        console.log('Sistema de sincronización inicializado', syncConfig);
+        
+        // Añadir entrada de log para el inicio de la aplicación
+        await IntercomDB.addLogEntry('info', 'Aplicación iniciada', {
+            timestamp: new Date(),
+            deviceInfo: navigator.userAgent
+        });
+        
+        // Cargar configuración desde localStorage o valores predeterminados
+        await loadConfig();
+        
         // Inicializar Socket.IO
         initSocketConnection();
         
@@ -64,395 +96,319 @@ document.addEventListener('DOMContentLoaded', () => {
         checkKioskMode();
         
         // Load saved role if exists
-        loadSavedRole();
+        await loadSavedRole();
+        
+        // Cargar historial de llamadas
+        await loadCallHistory();
+        
+        // Registrar esta tablet con el servidor PWA para admin
+        registerWithAdminServer();
+        
+        // Iniciar el envío periódico de métricas al servidor
+        startMetricsCollection();
     }
 
-    // Inicializar la conexión con el servidor de señalización
-    function initSocketConnection() {
-        console.log('Conectando al servidor de señalización...');
+    // Cargar configuración desde localStorage y DB
+    async function loadConfig() {
+        // Intentar cargar la configuración guardada de localStorage
+        const savedConfig = localStorage.getItem('intercom-config');
         
-        // Iniciar conexión al servidor de señalización
-        socket = io(config.signalingServer);
-        
-        // Eventos de Socket.IO
-        socket.on('connect', () => {
-            console.log('Conectado al servidor de señalización');
-            
-            // Registrar el dispositivo una vez conectado
-            registerDevice();
-        });
-        
-        socket.on('connect_error', (error) => {
-            console.error('Error de conexión con el servidor de señalización:', error);
-        });
-        
-        socket.on('disconnect', () => {
-            console.log('Desconectado del servidor de señalización');
-            appState.isRegistered = false;
-        });
-        
-        // Eventos específicos de señalización
-        socket.on('deviceList', (devices) => {
-            console.log('Lista de dispositivos actualizada:', devices);
-            // Aquí podrías actualizar una lista UI de dispositivos disponibles
-        });
-        
-        socket.on('incomingCall', (data) => {
-            console.log('Llamada entrante:', data);
-            handleIncomingCall(data);
-        });
-        
-        socket.on('callAccepted', (data) => {
-            console.log('Llamada aceptada:', data);
-            joinMiroTalkRoom(data.room);
-        });
-        
-        socket.on('callRejected', (data) => {
-            console.log('Llamada rechazada:', data);
-            endCall(false);
-        });
-        
-        socket.on('callEnded', (data) => {
-            console.log('Llamada finalizada:', data);
-            if (appState.inCall) {
-                endCall(false);
+        if (savedConfig) {
+            try {
+                const parsedConfig = JSON.parse(savedConfig);
+                // Actualizar solo las propiedades permitidas
+                if (parsedConfig.mirotalksfu) {
+                    // Merge config manteniendo valores predeterminados para propiedades faltantes
+                    if (parsedConfig.mirotalksfu.local) {
+                        config.mirotalksfu.local = {
+                            ...config.mirotalksfu.local,
+                            ...parsedConfig.mirotalksfu.local
+                        };
+                    }
+                    if (parsedConfig.mirotalksfu.fallback) {
+                        config.mirotalksfu.fallback = {
+                            ...config.mirotalksfu.fallback,
+                            ...parsedConfig.mirotalksfu.fallback
+                        };
+                    }
+                    
+                    // Mantener el servidor actual (si es válido)
+                    if (parsedConfig.mirotalksfu.currentServer === 'local' || 
+                        parsedConfig.mirotalksfu.currentServer === 'fallback') {
+                        config.mirotalksfu.currentServer = parsedConfig.mirotalksfu.currentServer;
+                    }
+                }
+                
+                if (parsedConfig.signalingServer) {
+                    config.signalingServer = parsedConfig.signalingServer;
+                }
+                
+                if (parsedConfig.adminServer) {
+                    config.adminServer = parsedConfig.adminServer;
+                    // Actualizar también en el módulo de sincronización
+                    await IntercomSync.setAdminServer(parsedConfig.adminServer);
+                }
+                
+                if (parsedConfig.pwaServer) {
+                    config.pwaServer = parsedConfig.pwaServer;
+                }
+                
+                console.log('Configuración cargada desde localStorage');
+            } catch (error) {
+                console.error('Error al cargar configuración:', error);
+                await IntercomDB.addErrorEntry('config', 'Error al cargar configuración', { error: error.message });
+                saveConfig(); // Guardar configuración predeterminada
             }
-        });
+        } else {
+            // Si no hay configuración guardada, guardar la predeterminada
+            saveConfig();
+            console.log('Configuración predeterminada guardada en localStorage');
+        }
         
-        socket.on('callError', (error) => {
-            console.error('Error en la llamada:', error);
-            showNotification('Error', `Error: ${error.message}`, 'error');
-        });
+        // Cargar configuraciones de audio/video desde IndexedDB
+        try {
+            const audioSettings = await IntercomDB.getSetting('audio');
+            if (audioSettings) {
+                config.mirotalksfu.params.audio = audioSettings;
+            }
+            
+            const videoSettings = await IntercomDB.getSetting('video');
+            if (videoSettings) {
+                config.mirotalksfu.params.video = videoSettings;
+            }
+        } catch (error) {
+            console.error('Error al cargar configuraciones de audio/video:', error);
+        }
     }
     
-    // Registrar el dispositivo en el servidor de señalización
-    function registerDevice() {
-        if (appState.isRegistered) return;
-        
-        const deviceName = appState.currentRole;
-        const deviceType = appState.currentRole;
-        
-        socket.emit('register', { deviceName, deviceType });
-        appState.isRegistered = true;
-        
-        console.log(`Dispositivo registrado como: ${deviceName} (${deviceType})`);
+    // Guardar configuración en localStorage
+    function saveConfig() {
+        try {
+            localStorage.setItem('intercom-config', JSON.stringify(config));
+        } catch (error) {
+            console.error('Error al guardar configuración:', error);
+            IntercomDB.addErrorEntry('config', 'Error al guardar configuración', { error: error.message });
+        }
     }
 
-    // Set up all event listeners
-    function setupEventListeners() {
-        // Role selection change
-        roleSelector.addEventListener('change', handleRoleChange);
+    /**
+     * INTEGRACIÓN CON PANEL DE ADMINISTRACIÓN
+     * Las siguientes funciones permiten que la tablet sea monitorizada
+     * desde el panel de administración separado.
+     */
+    
+    // Generar ID único para este dispositivo
+    function generateDeviceId() {
+        // Verificar si ya existe un ID guardado
+        const savedId = localStorage.getItem('intercom-device-id');
+        if (savedId) return savedId;
         
-        // Call button clicks
-        callButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                const target = button.getAttribute('data-target');
-                initiateCall(target);
+        // Generar un nuevo ID basado en timestamp y aleatorio
+        const newId = `tablet_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        localStorage.setItem('intercom-device-id', newId);
+        return newId;
+    }
+    
+    // Registrar este dispositivo con el servidor PWA para admin
+    async function registerWithAdminServer() {
+        try {
+            const deviceInfo = await collectDeviceInfo();
+            
+            const response = await fetch(`${config.pwaServer}/api/tablet/register`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    deviceId: appState.deviceId,
+                    deviceName: appState.currentRole,
+                    deviceType: appState.currentRole === 'portero' ? 'portero' : 'departamento',
+                    role: appState.currentRole,
+                    ip: deviceInfo.ip || 'unknown',
+                    version: deviceInfo.appVersion || '1.0.0'
+                })
             });
-        });
-        
-        // Hangup button
-        hangupBtn.addEventListener('click', () => endCall(true));
-        
-        // Mute button
-        muteBtn.addEventListener('click', toggleMute);
-        
-        // Handle back button/escape in call interface
-        window.addEventListener('popstate', (e) => {
-            if (appState.inCall) {
-                e.preventDefault();
-                endCall(true);
-            }
-        });
-    }
-
-    // Check if in kiosk mode
-    function checkKioskMode() {
-        // This would integrate with JamiPortero's kiosk mode feature
-        // For development, we'll just add a class if in standalone mode
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-            document.body.classList.add('kiosk-mode');
-        }
-    }
-
-    // Load saved role from storage
-    function loadSavedRole() {
-        const savedRole = localStorage.getItem('intercom-role');
-        if (savedRole) {
-            roleSelector.value = savedRole;
-            appState.currentRole = savedRole;
-            updateInterfaceForRole(savedRole);
-        } else {
-            updateInterfaceForRole('portero'); // Default
-        }
-    }
-
-    // Handle role change from dropdown
-    function handleRoleChange(e) {
-        const newRole = e.target.value;
-        appState.currentRole = newRole;
-        
-        // Save to localStorage
-        localStorage.setItem('intercom-role', newRole);
-        
-        updateInterfaceForRole(newRole);
-        
-        // Re-registrar con el nuevo rol
-        if (socket && socket.connected) {
-            registerDevice();
-        }
-    }
-
-    // Update UI based on selected role
-    function updateInterfaceForRole(role) {
-        if (role === 'portero') {
-            porteroInterface.classList.remove('hidden');
-            administracionInterface.classList.add('hidden');
-        } else if (role === 'administracion') {
-            porteroInterface.classList.add('hidden');
-            administracionInterface.classList.remove('hidden');
-        }
-    }
-
-    /**
-     * CALL FUNCTIONALITY
-     * The following functions will integrate with MiroTalkSFU
-     */
-
-    // Initiate a call to the target department
-    function initiateCall(target) {
-        console.log(`Iniciando llamada a: ${target}`);
-        
-        if (!socket || !socket.connected) {
-            showNotification('Error', 'No hay conexión con el servidor', 'error');
-            return;
-        }
-        
-        // Update app state
-        appState.inCall = true;
-        appState.callTarget = target;
-        
-        // Crear un ID de sala único
-        const room = `intercom_${appState.currentRole}_${target}_${Date.now()}`;
-        appState.currentRoom = room;
-        
-        // Enviar solicitud de llamada al servidor de señalización
-        socket.emit('callRequest', {
-            from: appState.currentRole,
-            to: target,
-            roomId: room
-        });
-        
-        // Update UI
-        callTargetEl.textContent = target.charAt(0).toUpperCase() + target.slice(1);
-        callInterface.classList.remove('hidden');
-        
-        // Add to history so back button works properly
-        history.pushState({inCall: true}, '', '#call');
-        
-        // Start call timer
-        startCallTimer();
-        
-        // Reproducir tono de llamada saliente (si existe)
-        if (sounds.ringtone) {
-            sounds.ringtone.loop = true;
-            sounds.ringtone.play().catch(e => console.error('Error al reproducir ringtone:', e));
-        }
-        
-        // Mostrar notificación
-        showNotification('Llamando', `Llamando a ${target}...`, 'info');
-    }
-
-    // End the current call
-    function endCall(notifyServer = true) {
-        console.log('Terminando llamada');
-        
-        // Detener sonidos
-        if (sounds.ringtone) sounds.ringtone.pause();
-        if (sounds.callEnd) sounds.callEnd.play().catch(e => console.log('Error al reproducir sonido de fin:', e));
-        
-        // Si estamos en una llamada, notificar al servidor
-        if (notifyServer && appState.currentRoom) {
-            socket.emit('callHangup', { room: appState.currentRoom });
-        }
-        
-        // Update app state
-        appState.inCall = false;
-        appState.currentRoom = null;
-        appState.incomingCall = null;
-        
-        // Stop the timer
-        stopCallTimer();
-        
-        // Hide call interface
-        callInterface.classList.add('hidden');
-        
-        // Go back in history
-        if (history.state && history.state.inCall) {
-            history.back();
-        }
-    }
-
-    // Toggle mute status
-    function toggleMute() {
-        appState.muted = !appState.muted;
-        muteBtn.querySelector('.icon').textContent = appState.muted ? '🔊' : '🔇';
-        muteBtn.querySelector('.label').textContent = appState.muted ? 'Activar' : 'Silenciar';
-        
-        // En una implementación real, esto controlaría el audio de la videollamada
-    }
-
-    // Start the call timer
-    function startCallTimer() {
-        const timerEl = document.querySelector('.call-timer');
-        appState.callStartTime = new Date();
-        
-        appState.timerInterval = setInterval(() => {
-            const now = new Date();
-            const diff = now - appState.callStartTime;
             
-            const minutes = Math.floor(diff / 60000);
-            const seconds = Math.floor((diff % 60000) / 1000);
-            
-            timerEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        }, 1000);
-    }
-
-    // Stop the call timer
-    function stopCallTimer() {
-        if (appState.timerInterval) {
-            clearInterval(appState.timerInterval);
-            appState.timerInterval = null;
-        }
-    }
-
-    /**
-     * INCOMING CALL HANDLER
-     * These functions will be triggered by the MiroTalkSFU signaling server
-     */
-    
-    // Handle an incoming call
-    function handleIncomingCall(data) {
-        const { from, room, timestamp } = data;
-        
-        // Guardar datos de la llamada entrante
-        appState.incomingCall = data;
-        
-        // Crear o mostrar la interfaz de llamada entrante
-        showIncomingCallInterface(from, room);
-        
-        // Reproducir tono de llamada entrante
-        if (sounds.ringtone) {
-            sounds.ringtone.loop = true;
-            sounds.ringtone.play().catch(e => console.error('Error al reproducir ringtone:', e));
-        }
-        
-        // Mostrar notificación de sistema (si está permitido)
-        if ('Notification' in window) {
-            if (Notification.permission === 'granted') {
-                new Notification('Llamada entrante', {
-                    body: `${from} está llamando`,
-                    icon: '/icons/icon-192x192.png'
-                });
-            } else if (Notification.permission !== 'denied') {
-                Notification.requestPermission();
+            if (!response.ok) {
+                throw new Error(`Error al registrar dispositivo: ${response.status} ${response.statusText}`);
             }
+            
+            const result = await response.json();
+            console.log('Dispositivo registrado con el servidor de administración:', result);
+            
+            return true;
+        } catch (error) {
+            console.error('Error al registrar con servidor admin:', error);
+            IntercomDB.addErrorEntry('admin', 'Error al registrar con servidor admin', { error: error.message });
+            return false;
         }
     }
     
-    // Mostrar interfaz de llamada entrante
-    function showIncomingCallInterface(from, room) {
-        // Esta función debería crear y mostrar una interfaz para llamadas entrantes
-        // Para simplicidad, usaremos un confirm, pero en producción debería ser un elemento UI bonito
+    // Iniciar recolección periódica de métricas para enviar al servidor
+    function startMetricsCollection() {
+        // Enviar métricas iniciales
+        sendMetricsToAdminServer();
         
-        // Detener cualquier llamada actual
-        if (appState.inCall) {
-            endCall(true);
+        // Configurar envío periódico cada minuto
+        setInterval(() => {
+            sendMetricsToAdminServer();
+        }, 60000); // 1 minuto
+    }
+    
+    // Enviar métricas actualizadas al servidor
+    async function sendMetricsToAdminServer() {
+        try {
+            // Recopilar información del dispositivo
+            const deviceInfo = await collectDeviceInfo();
+            
+            // Obtener estadísticas de llamadas
+            const callStats = await IntercomDB.getCallStats();
+            
+            // Enviar datos al servidor
+            const response = await fetch(`${config.pwaServer}/api/tablet/update`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    deviceId: appState.deviceId,
+                    metrics: {
+                        role: appState.currentRole,
+                        battery: deviceInfo.battery?.level || 0,
+                        version: deviceInfo.appVersion || '1.0.0',
+                        performance: {
+                            memory: deviceInfo.memory || {},
+                            cpu: deviceInfo.cpu || 0,
+                            network: deviceInfo.connection?.type || 'unknown',
+                            battery: deviceInfo.battery?.level || 0,
+                            charging: deviceInfo.battery?.charging || false
+                        },
+                        hardware: {
+                            model: deviceInfo.model || 'unknown',
+                            osVersion: deviceInfo.osVersion || 'unknown',
+                            screenWidth: window.screen.width,
+                            screenHeight: window.screen.height,
+                            storage: deviceInfo.storage || {}
+                        },
+                        stats: {
+                            callCount: callStats.total || 0,
+                            errorCount: 0, // Obtener desde los registros de errores
+                            connectedTime: Math.floor((Date.now() - performance.timing.navigationStart) / 1000),
+                            lastCall: callStats.lastCall || null
+                        }
+                    }
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Error al actualizar métricas: ${response.status} ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            console.log('Métricas enviadas al servidor admin:', result);
+            
+            return true;
+        } catch (error) {
+            console.error('Error al enviar métricas al servidor admin:', error);
+            IntercomDB.addErrorEntry('admin', 'Error al enviar métricas', { error: error.message });
+            return false;
         }
+    }
+    
+    // Recopilar información sobre el dispositivo actual
+    async function collectDeviceInfo() {
+        const info = {
+            appVersion: '1.0.0', // Versión de la aplicación
+            osVersion: 'Unknown',
+            model: 'Unknown',
+            ip: 'Unknown',
+            connection: null,
+            memory: null,
+            storage: null,
+            battery: null,
+            cpu: 0
+        };
         
-        // Por ahora usamos confirm, pero idealmente sería una UI personalizada
-        const accept = confirm(`Llamada entrante de ${from}. ¿Aceptar?`);
-        
-        if (accept) {
-            acceptCall(room);
-        } else {
-            rejectCall(room);
+        try {
+            // Información de conexión
+            if (navigator.connection) {
+                info.connection = {
+                    type: navigator.connection.effectiveType || 'unknown',
+                    downlink: navigator.connection.downlink,
+                    rtt: navigator.connection.rtt
+                };
+            }
+            
+            // Información del sistema operativo y dispositivo
+            const userAgent = navigator.userAgent;
+            if (/android/i.test(userAgent)) {
+                info.osVersion = 'Android';
+                const match = userAgent.match(/Android\s([0-9.]+)/);
+                if (match) info.osVersion = `Android ${match[1]}`;
+            } else if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+                info.osVersion = 'iOS';
+                const match = userAgent.match(/OS\s([0-9_]+)/);
+                if (match) info.osVersion = `iOS ${match[1].replace('_', '.')}`;
+            } else if (/Windows/.test(userAgent)) {
+                info.osVersion = 'Windows';
+            } else if (/Mac/.test(userAgent)) {
+                info.osVersion = 'MacOS';
+            } else if (/Linux/.test(userAgent)) {
+                info.osVersion = 'Linux';
+            }
+            
+            // Modelo del dispositivo (limitado)
+            if (/Mobile/.test(userAgent)) {
+                info.model = 'Mobile Device';
+            } else if (/Tablet/.test(userAgent)) {
+                info.model = 'Tablet Device';
+            } else {
+                info.model = 'Desktop Device';
+            }
+            
+            // Memoria
+            if (navigator.deviceMemory) {
+                info.memory = {
+                    total: navigator.deviceMemory * 1024, // Convertir a MB
+                    used: 0 // No disponible en navegador
+                };
+            }
+            
+            // Almacenamiento
+            if (navigator.storage && navigator.storage.estimate) {
+                const estimate = await navigator.storage.estimate();
+                info.storage = {
+                    total: estimate.quota,
+                    used: estimate.usage
+                };
+            }
+            
+            // Batería
+            if (navigator.getBattery) {
+                const battery = await navigator.getBattery();
+                info.battery = {
+                    level: Math.round(battery.level * 100),
+                    charging: battery.charging
+                };
+            }
+            
+            // IP (se obtendrá en el servidor)
+            
+            return info;
+        } catch (error) {
+            console.error('Error al recopilar información del dispositivo:', error);
+            return info;
         }
-    }
-    
-    // Aceptar una llamada entrante
-    function acceptCall(room) {
-        console.log(`Aceptando llamada en sala: ${room}`);
-        
-        // Detener sonido de llamada
-        if (sounds.ringtone) sounds.ringtone.pause();
-        
-        // Informar al servidor que aceptamos la llamada
-        socket.emit('callAnswer', { room, answer: true });
-        
-        // Unirse a la sala de MiroTalkSFU
-        joinMiroTalkRoom(room);
-    }
-    
-    // Rechazar una llamada entrante
-    function rejectCall(room) {
-        console.log(`Rechazando llamada en sala: ${room}`);
-        
-        // Detener sonido de llamada
-        if (sounds.ringtone) sounds.ringtone.pause();
-        
-        // Informar al servidor que rechazamos la llamada
-        socket.emit('callAnswer', { room, answer: false });
-        
-        // Limpiar estado
-        appState.incomingCall = null;
-    }
-    
-    // Unirse a una sala de MiroTalkSFU
-    function joinMiroTalkRoom(room) {
-        // Construir URL para unirse a la sala de MiroTalkSFU
-        const joinUrl = constructMiroTalkJoinUrl(room);
-        
-        console.log(`Uniendo a MiroTalkSFU: ${joinUrl}`);
-        
-        // Redirigir a la sala de videollamada
-        window.location.href = joinUrl;
-    }
-    
-    // Construir URL para unirse a MiroTalkSFU
-    function constructMiroTalkJoinUrl(room) {
-        const { url, params } = config.mirotalksfu;
-        
-        // Construir URL con parámetros para unirse directamente con audio/video ya habilitados
-        const joinUrl = new URL(`join`, url);
-        
-        // Añadir parámetros
-        joinUrl.searchParams.append('room', room);
-        joinUrl.searchParams.append('name', appState.currentRole);
-        joinUrl.searchParams.append('audio', params.audio ? '1' : '0');
-        joinUrl.searchParams.append('video', params.video ? '1' : '0');
-        joinUrl.searchParams.append('screen', params.screen ? '1' : '0');
-        joinUrl.searchParams.append('notify', params.notify ? '1' : '0');
-        
-        // Añadir parámetro para URL de retorno después de colgar
-        const returnUrl = new URL('return.html', window.location.origin);
-        returnUrl.searchParams.append('room', room);
-        returnUrl.searchParams.append('from', appState.currentRole);
-        returnUrl.searchParams.append('to', appState.callTarget || '');
-        returnUrl.searchParams.append('action', 'hangup');
-        
-        // Añadir la URL de retorno como parámetro
-        joinUrl.searchParams.append('exitURL', returnUrl.toString());
-        
-        return joinUrl.toString();
-    }
-    
-    // Mostrar una notificación en pantalla
-    function showNotification(title, message, type = 'info') {
-        // En una implementación real, esto mostraría un toast o alerta UI
-        console.log(`[${type.toUpperCase()}] ${title}: ${message}`);
     }
 
     // Initialize the app
     init();
+    
+    // Iniciar verificación de servidores
+    startServerCheck();
+    
+    // Programar sincronización completa con servidor admin cada hora
+    setInterval(() => {
+        IntercomSync.syncData();
+    }, 3600000); // 1 hora
 });
