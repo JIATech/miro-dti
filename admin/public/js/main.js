@@ -141,6 +141,11 @@ function initializeUI() {
         saveTabletsSettings();
     });
     
+    document.getElementById('security-settings-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        changeAdminPassword(e);
+    });
+    
     // Delegación de eventos para botones dinámicos
     document.addEventListener('click', function(e) {
         // Botones de acciones de servicios
@@ -808,7 +813,7 @@ function toggleLogsPause() {
     }
 }
 
-function clearLogs() {
+function clearLogs(timePeriod) {
     const collections = ['all', 'pwa', 'signaling', 'mirotalksfu', 'tablets'];
     
     collections.forEach(collection => {
@@ -816,7 +821,20 @@ function clearLogs() {
         if (container) {
             container.innerHTML = '<div class="text-center text-muted">Logs limpiados</div>';
         }
+        
+        // Limpiar datos en la aplicación
+        appState.logs.data[collection] = appState.logs.data[collection].filter(log => {
+            if (!timePeriod) return false;
+            const logDate = new Date(log.timestamp);
+            const now = new Date();
+            const diff = now - logDate;
+            const period = timePeriod === 'hour' ? 3600000 : timePeriod === 'day' ? 86400000 : 604800000;
+            return diff < period;
+        });
     });
+    
+    // Mostrar mensaje de confirmación
+    showToast('Logs Limpiados', 'Los logs han sido limpiados correctamente', 'success');
 }
 
 function toggleAutoScroll() {
@@ -826,46 +844,16 @@ function toggleAutoScroll() {
 function toggleTimestamps() {
     appState.logs.showTimestamps = document.getElementById('show-timestamps').checked;
     
-    // Re-renderizar los logs
-    clearLogs();
-    Object.keys(appState.logs.data).forEach(collection => {
-        const logs = appState.logs.data[collection];
-        logs.forEach(log => {
-            handleLogMessage(log);
-        });
-    });
+    // Actualizar visualización
+    updateLogDisplay();
 }
 
 function applyFilter() {
-    const filterInput = document.getElementById('log-filter');
-    appState.logs.filter = filterInput.value.trim();
+    const filterText = document.getElementById('logs-filter').value.trim().toLowerCase();
+    appState.logs.filter = filterText;
     
-    // Re-renderizar logs
-    clearLogs();
-    
-    // Si el filtro está vacío, mostrar todos los logs
-    if (!appState.logs.filter) {
-        Object.keys(appState.logs.data).forEach(collection => {
-            const logs = appState.logs.data[collection];
-            logs.forEach(log => {
-                handleLogMessage(log);
-            });
-        });
-        return;
-    }
-    
-    // Aplicar filtro
-    Object.keys(appState.logs.data).forEach(collection => {
-        const logs = appState.logs.data[collection];
-        const filteredLogs = logs.filter(log => 
-            log.message.toLowerCase().includes(appState.logs.filter.toLowerCase())
-        );
-        
-        // Mostrar logs filtrados
-        filteredLogs.forEach(log => {
-            handleLogMessage(log);
-        });
-    });
+    // Actualizar visualización
+    updateLogDisplay();
 }
 
 // Funciones para servicios
@@ -1065,605 +1053,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inicializar interfaz
     initializeUI();
     
-    // Conectar con Socket.IO
-    connectSocket();
-    
-    // Actualizar estado de servicios periódicamente
-    setInterval(fetchServiceStatus, 30000); // Cada 30 segundos
-});
-
-// Manejar acción de servicio
-function handleServiceAction(buttonElement) {
-    if (!buttonElement) return;
-    
-    const action = buttonElement.dataset.action;
-    const serviceType = buttonElement.dataset.service;
-    const deviceId = buttonElement.dataset.device || null;
-    
-    // Guardar la acción actual para la confirmación
-    currentAction = {
-        action,
-        service: serviceType,
-        deviceId
-    };
-    
-    // Acciones que requieren confirmación
-    const actionsRequiringConfirmation = [
-        'restart', 'shutdown', 'reset-config', 'clear-logs', 'factory-reset'
-    ];
-    
-    // Si la acción requiere confirmación, mostrar diálogo
-    if (actionsRequiringConfirmation.includes(action)) {
-        let title, message;
-        
-        switch (action) {
-            case 'restart':
-                title = 'Confirmar Reinicio';
-                message = `¿Está seguro de que desea reiniciar el servicio ${serviceType}?`;
-                break;
-            case 'shutdown':
-                title = 'Confirmar Apagado';
-                message = `¿Está seguro de que desea apagar el servicio ${serviceType}?`;
-                break;
-            case 'reset-config':
-                title = 'Confirmar Restablecimiento';
-                message = `¿Está seguro de que desea restablecer la configuración de ${serviceType} a los valores predeterminados?`;
-                break;
-            case 'clear-logs':
-                title = 'Confirmar Limpieza';
-                message = '¿Está seguro de que desea eliminar los logs antiguos? Esta acción no se puede deshacer.';
-                break;
-            case 'factory-reset':
-                title = 'Confirmar Restablecimiento de Fábrica';
-                message = '¿Está seguro de que desea restablecer todo el sistema a los valores de fábrica? Esta acción eliminará todos los datos y configuraciones personalizadas.';
-                break;
-            default:
-                title = 'Confirmar Acción';
-                message = `¿Está seguro de que desea realizar la acción ${action} en ${serviceType}?`;
-        }
-        
-        // Actualizar el modal de confirmación y mostrarlo
-        document.getElementById('confirm-modal-title').textContent = title;
-        document.getElementById('confirm-modal-body').textContent = message;
-        confirmModal.show();
-    } else {
-        // Si no requiere confirmación, ejecutar directamente
-        executeServiceAction(currentAction);
-    }
-}
-
-// Ejecutar acción confirmada desde el modal
-function confirmAction() {
-    // Cerrar el modal
-    confirmModal.hide();
-    
-    // Ejecutar la acción guardada
-    executeServiceAction(currentAction);
-}
-
-// Ejecutar acción de servicio
-function executeServiceAction(actionData) {
-    if (!actionData || !actionData.action) return;
-    
-    const { action, service, deviceId } = actionData;
-    let endpoint = '';
-    let method = 'POST';
-    let body = {};
-    
-    // Configurar la petición según el tipo de acción
-    if (deviceId) {
-        // Acciones específicas de tablet
-        endpoint = `/api/tablets/${deviceId}/${action}`;
-        body = { deviceId };
-    } else {
-        // Acciones generales de servicio
-        endpoint = `/api/services/${service}/${action}`;
-        body = { service };
-    }
-    
-    // Mostrar indicador de carga
-    showToast('Procesando', `Ejecutando acción ${action}...`, 'info');
-    
-    // Realizar la petición al servidor
-    fetch(endpoint, {
-        method,
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log('Respuesta de acción:', data);
-        showToast('Éxito', data.message || 'Acción completada con éxito', 'success');
-        
-        // Si es necesario, actualizar la interfaz
-        if (['restart', 'shutdown', 'reset-config'].includes(action)) {
-            // Actualizar estado de servicio después de una pausa
-            setTimeout(() => {
-                fetchServiceStatus();
-            }, 2000);
-        } else if (action === 'clear-logs') {
-            // Limpiar logs en la interfaz
-            clearLogs();
-        } else if (action === 'factory-reset') {
-            // Mostrar mensaje de reinicio y recargar después de un tiempo
-            showToast('Reiniciando', 'El sistema se está reiniciando...', 'info', 10000);
-            setTimeout(() => {
-                window.location.reload();
-            }, 10000);
-        } else if (deviceId) {
-            // Si es una acción de tablet, actualizar su vista
-            setTimeout(() => {
-                loadTablets();
-            }, 1000);
-        }
-    })
-    .catch(error => {
-        console.error('Error al ejecutar acción:', error);
-        showToast('Error', `No se pudo completar la acción: ${error.message}`, 'error');
-    });
-}
-
-// Obtener estado de los servicios
-function fetchServiceStatus() {
-    const servicesContainer = document.getElementById('services-status');
-    
-    // Si hay elemento de carga, mostrarlo
-    const loadingIndicator = document.getElementById('services-loading');
-    if (loadingIndicator) {
-        loadingIndicator.style.display = 'block';
-    }
-    
-    // Realizar petición al servidor
-    fetch('/api/services/status')
-        .then(response => response.json())
-        .then(data => {
-            console.log('Estado de servicios recibido:', data);
-            
-            // Actualizar el estado en la aplicación
-            appState.services.status = data;
-            appState.services.lastCheck = new Date();
-            
-            // Limpiar contenedor
-            if (servicesContainer) {
-                servicesContainer.innerHTML = '';
-            }
-            
-            // Crear tarjetas para cada servicio
-            Object.entries(data).forEach(([service, status]) => {
-                if (servicesContainer) {
-                    const serviceCard = createServiceCard(service, status);
-                    servicesContainer.appendChild(serviceCard);
-                }
-            });
-            
-            // Ocultar indicador de carga
-            if (loadingIndicator) {
-                loadingIndicator.style.display = 'none';
-            }
-            
-            // Actualizar última comprobación
-            const lastCheckEl = document.getElementById('services-last-check');
-            if (lastCheckEl) {
-                lastCheckEl.textContent = formatFullDateTime(new Date());
-            }
-        })
-        .catch(error => {
-            console.error('Error al obtener estado de servicios:', error);
-            showToast('Error', 'No se pudo obtener el estado de los servicios', 'error');
-            
-            // Ocultar indicador de carga
-            if (loadingIndicator) {
-                loadingIndicator.style.display = 'none';
-            }
-        });
-}
-
-// Crear tarjeta para un servicio
-function createServiceCard(serviceName, status) {
-    const card = document.createElement('div');
-    card.className = 'card service-card mb-3';
-    
-    // Título apropiado para el servicio
-    let serviceTitle = serviceName.charAt(0).toUpperCase() + serviceName.slice(1);
-    
-    // Íconos para cada servicio
-    let serviceIcon = '';
-    switch (serviceName) {
-        case 'pwa':
-            serviceIcon = 'bi-window';
-            serviceTitle = 'PWA Intercom';
-            break;
-        case 'signaling':
-            serviceIcon = 'bi-telephone';
-            serviceTitle = 'Servidor Signaling';
-            break;
-        case 'mirotalksfu':
-            serviceIcon = 'bi-camera-video';
-            serviceTitle = 'MiroTalk SFU';
-            break;
-        case 'mongodb':
-            serviceIcon = 'bi-database';
-            serviceTitle = 'MongoDB';
-            break;
-        case 'admin':
-            serviceIcon = 'bi-gear';
-            serviceTitle = 'Panel Admin';
-            break;
-        default:
-            serviceIcon = 'bi-hdd-stack';
-    }
-    
-    // Determinar las clases de estado
-    let statusClass = 'bg-secondary';
-    let statusText = 'Desconocido';
-    
-    if (status.running) {
-        statusClass = 'bg-success';
-        statusText = 'Activo';
-    } else if (status.status === 'stopped') {
-        statusClass = 'bg-danger';
-        statusText = 'Detenido';
-    } else if (status.status === 'restarting') {
-        statusClass = 'bg-warning';
-        statusText = 'Reiniciando';
-    } else if (status.status === 'error') {
-        statusClass = 'bg-danger';
-        statusText = 'Error';
-    }
-    
-    // Crear contenido de la tarjeta
-    card.innerHTML = `
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <div>
-                <i class="bi ${serviceIcon} me-2"></i>
-                <strong>${serviceTitle}</strong>
-            </div>
-            <span class="badge ${statusClass}">${statusText}</span>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <p class="mb-1"><small>Tiempo activo: ${status.uptime ? formatUptime(status.uptime) : 'N/A'}</small></p>
-                    <p class="mb-1"><small>Puerto: ${status.port || 'N/A'}</small></p>
-                    <p class="mb-0"><small>PID: ${status.pid || 'N/A'}</small></p>
-                </div>
-                <div class="col-md-6 text-end">
-                    <p class="mb-1"><small>Memoria: ${status.memory ? formatMemory(status.memory) : 'N/A'}</small></p>
-                    <p class="mb-1"><small>CPU: ${status.cpu ? status.cpu + '%' : 'N/A'}</small></p>
-                    <p class="mb-0"><small>Versión: ${status.version || 'N/A'}</small></p>
-                </div>
-            </div>
-        </div>
-        <div class="card-footer bg-light d-flex justify-content-end">
-            <div class="btn-group btn-group-sm" role="group">
-                <button type="button" class="btn btn-outline-primary" data-action="restart" data-service="${serviceName}" ${!status.running ? 'disabled' : ''}>
-                    <i class="bi bi-arrow-clockwise me-1"></i> Reiniciar
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-action="${status.running ? 'shutdown' : 'start'}" data-service="${serviceName}">
-                    <i class="bi ${status.running ? 'bi-stop-circle' : 'bi-play-circle'} me-1"></i>
-                    ${status.running ? 'Detener' : 'Iniciar'}
-                </button>
-                <button type="button" class="btn btn-outline-info" data-action="logs" data-service="${serviceName}">
-                    <i class="bi bi-journal-text me-1"></i> Logs
-                </button>
-            </div>
-        </div>
-    `;
-    
-    return card;
-}
-
-// Obtener estadísticas del sistema
-function fetchSystemStats() {
-    fetch('/api/system/stats')
-        .then(response => response.json())
-        .then(data => {
-            console.log('Estadísticas del sistema recibidas:', data);
-            
-            // Actualizar interfaz con las estadísticas
-            if (data.system) {
-                document.getElementById('system-uptime').textContent = formatUptime(data.system.uptime || 0);
-                document.getElementById('system-memory').textContent = formatMemory(data.system.memory?.total || 0);
-                document.getElementById('system-free-memory').textContent = formatMemory(data.system.memory?.free || 0);
-                document.getElementById('system-cpu-usage').textContent = data.system.cpu ? data.system.cpu.toFixed(1) + '%' : 'N/A';
-            }
-            
-            if (data.version) {
-                document.getElementById('system-version').textContent = data.version;
-            }
-            
-            // Actualizar gráficos si hay datos de llamadas y errores
-            if (data.calls) {
-                handleStatsUpdate({ calls: data.calls });
-            }
-            
-            if (data.errors) {
-                handleStatsUpdate({ errors: data.errors });
-            }
-        })
-        .catch(error => {
-            console.error('Error al obtener estadísticas del sistema:', error);
-        });
-}
-
-// Operaciones para los logs
-function toggleLogsPause() {
-    appState.logs.paused = !appState.logs.paused;
-    
-    const button = document.getElementById('toggle-logs-pause');
-    if (button) {
-        if (appState.logs.paused) {
-            button.innerHTML = '<i class="bi bi-play-fill"></i> Reanudar';
-            button.classList.remove('btn-warning');
-            button.classList.add('btn-success');
-        } else {
-            button.innerHTML = '<i class="bi bi-pause-fill"></i> Pausar';
-            button.classList.remove('btn-success');
-            button.classList.add('btn-warning');
-        }
-    }
-}
-
-function toggleAutoScroll() {
-    appState.logs.autoScroll = document.getElementById('auto-scroll').checked;
-}
-
-function toggleTimestamps() {
-    appState.logs.showTimestamps = document.getElementById('show-timestamps').checked;
-    
-    // Actualizar visualización
-    updateLogDisplay();
-}
-
-function applyFilter() {
-    const filterText = document.getElementById('logs-filter').value.trim().toLowerCase();
-    appState.logs.filter = filterText;
-    
-    // Actualizar visualización
-    updateLogDisplay();
-}
-
-// Actualizar visualización de logs
-function updateLogDisplay() {
-    const collections = ['all', 'pwa', 'signaling', 'mirotalksfu', 'tablets'];
-    
-    collections.forEach(collection => {
-        const container = document.getElementById(`${collection}-logs-container`);
-        if (!container) return;
-        
-        // Filtrar logs si hay un filtro activo
-        let logsToShow = [...appState.logs.data[collection] || []];
-        
-        if (appState.logs.filter) {
-            logsToShow = logsToShow.filter(log => 
-                log.message.toLowerCase().includes(appState.logs.filter)
-            );
-        }
-        
-        // Limpiar contenedor
-        container.innerHTML = '';
-        
-        // Si no hay logs, mostrar mensaje
-        if (logsToShow.length === 0) {
-            container.innerHTML = '<div class="text-center text-muted p-3">No hay logs disponibles</div>';
-            return;
-        }
-        
-        // Añadir cada log al contenedor
-        logsToShow.forEach(log => {
-            const logElement = document.createElement('div');
-            logElement.className = 'log-line';
-            
-            // Añadir clases según el nivel del log
-            if (log.level === 'error' || log.message.toLowerCase().includes('error')) {
-                logElement.classList.add('log-line-error');
-            } else if (log.level === 'warning' || log.message.toLowerCase().includes('warning')) {
-                logElement.classList.add('log-line-warning');
-            } else if (log.level === 'success' || log.message.toLowerCase().includes('success')) {
-                logElement.classList.add('log-line-success');
-            }
-            
-            // Contenido del log
-            let logContent = '';
-            
-            // Timestamp si está activado
-            if (appState.logs.showTimestamps && log.timestamp) {
-                logContent += `<span class="log-timestamp">${formatDateTime(log.timestamp)}</span>`;
-            }
-            
-            // Servicio si estamos en la vista "all"
-            if (collection === 'all' && log.service) {
-                logContent += `<span class="badge bg-secondary me-1">${log.service}</span>`;
-            }
-            
-            // Mensaje
-            logContent += log.message;
-            
-            // Establecer contenido
-            logElement.innerHTML = logContent;
-            
-            // Añadir al contenedor
-            container.appendChild(logElement);
-        });
-        
-        // Auto-scroll si está activado
-        if (appState.logs.autoScroll) {
-            container.scrollTop = container.scrollHeight;
-        }
-    });
-}
-
-function clearLogs() {
-    const collections = ['all', 'pwa', 'signaling', 'mirotalksfu', 'tablets'];
-    
-    collections.forEach(collection => {
-        const container = document.getElementById(`${collection}-logs-container`);
-        if (container) {
-            container.innerHTML = '';
-        }
-        
-        // Limpiar datos en la aplicación
-        appState.logs.data[collection] = [];
-    });
-    
-    // Mostrar mensaje de confirmación
-    showToast('Logs Limpiados', 'Los logs han sido limpiados correctamente', 'success');
-}
-
-// Guardar configuración general
-function saveGeneralSettings() {
-    const settings = {
-        logRetention: parseInt(document.getElementById('log-retention-days').value),
-        autoCleanup: document.getElementById('auto-cleanup').checked,
-        notifyErrors: document.getElementById('notify-errors').checked,
-        theme: document.querySelector('input[name="theme-option"]:checked').value
-    };
-    
-    // Validar datos
-    if (isNaN(settings.logRetention) || settings.logRetention < 1) {
-        showToast('Error', 'El período de retención de logs debe ser un número positivo', 'error');
-        return;
-    }
-    
-    // Guardar configuración
-    fetch('/api/settings/general', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(settings)
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log('Configuración guardada:', data);
-        showToast('Configuración Guardada', 'La configuración general ha sido actualizada', 'success');
-        
-        // Aplicar tema si se cambió
-        applyTheme(settings.theme);
-    })
-    .catch(error => {
-        console.error('Error al guardar configuración:', error);
-        showToast('Error', `No se pudo guardar la configuración: ${error.message}`, 'error');
-    });
-}
-
-// Guardar configuración de tablets
-function saveTabletsSettings() {
-    const settings = {
-        syncInterval: parseInt(document.getElementById('sync-interval').value),
-        metricsSamplingRate: parseInt(document.getElementById('metrics-sampling-rate').value),
-        autoReconnect: document.getElementById('auto-reconnect').checked,
-        keepAlivePing: document.getElementById('keep-alive-ping').checked
-    };
-    
-    // Validar datos
-    if (isNaN(settings.syncInterval) || settings.syncInterval < 1) {
-        showToast('Error', 'El intervalo de sincronización debe ser un número positivo', 'error');
-        return;
-    }
-    
-    if (isNaN(settings.metricsSamplingRate) || settings.metricsSamplingRate < 1) {
-        showToast('Error', 'La frecuencia de muestreo debe ser un número positivo', 'error');
-        return;
-    }
-    
-    // Guardar configuración
-    fetch('/api/settings/tablets', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(settings)
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`Error ${response.status}: ${response.statusText}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log('Configuración de tablets guardada:', data);
-        showToast('Configuración Guardada', 'La configuración de tablets ha sido actualizada', 'success');
-    })
-    .catch(error => {
-        console.error('Error al guardar configuración de tablets:', error);
-        showToast('Error', `No se pudo guardar la configuración: ${error.message}`, 'error');
-    });
-}
-
-// Aplicar tema
-function applyTheme(theme) {
-    document.documentElement.setAttribute('data-bs-theme', theme);
-    localStorage.setItem('theme', theme);
-}
-
-// Mostrar notificación toast
-function showToast(title, message, type = 'info', duration = 5000) {
-    const toastElement = document.getElementById('notification-toast');
-    const toastTitle = document.getElementById('toast-title');
-    const toastMessage = document.getElementById('toast-message');
-    
-    // Establecer título y mensaje
-    toastTitle.textContent = title;
-    toastMessage.textContent = message;
-    
-    // Establecer tipo (color)
-    toastElement.className = 'toast';
-    
-    switch (type) {
-        case 'success':
-            toastElement.classList.add('bg-success', 'text-white');
-            break;
-        case 'error':
-            toastElement.classList.add('bg-danger', 'text-white');
-            break;
-        case 'warning':
-            toastElement.classList.add('bg-warning', 'text-dark');
-            break;
-        default:
-            toastElement.classList.add('bg-info', 'text-white');
-    }
-    
-    // Configurar duración
-    if (duration !== 5000) {
-        toastInstance._config.autohide = true;
-        toastInstance._config.delay = duration;
-    }
-    
-    // Mostrar toast
-    toastInstance.show();
-}
-
-// Alternar modo de pantalla completa
-function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(e => {
-            console.error('Error al intentar pantalla completa:', e);
-        });
-    } else {
-        if (document.exitFullscreen) {
-            document.exitFullscreen();
-        }
-    }
-}
-
-// Eventos del documento
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar interfaz
-    initializeUI();
-    
     // Inicializar gráficos
     initializeCharts();
     
@@ -1672,6 +1061,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Conectar con Socket.IO
     connectSocket();
+    
+    // Configurar event listeners para el menú de borrado de logs por período
+    document.querySelectorAll('#clear-logs-dropdown + .dropdown-menu .dropdown-item').forEach(button => {
+        button.addEventListener('click', function() {
+            const timePeriod = this.getAttribute('data-time-period');
+            clearLogs(timePeriod);
+        });
+    });
     
     // Cargar tema guardado
     const savedTheme = localStorage.getItem('theme') || 'light';
@@ -1689,3 +1086,98 @@ window.adminPanel = {
     toggleLogsPause,
     handleTabletUpdate
 };
+
+// Borrar logs según el período de tiempo seleccionado
+function clearLogsByTimePeriod(timePeriod) {
+    const collections = ['all', 'system', 'call', 'error', 'performance'];
+    const now = new Date();
+    let cutoffDate = new Date();
+    let confirmMessage = '';
+    
+    // Determinar la fecha de corte según el período seleccionado
+    switch(timePeriod) {
+        case '1h':
+            cutoffDate.setHours(now.getHours() - 1);
+            confirmMessage = 'Logs de la última hora';
+            break;
+        case '24h':
+            cutoffDate.setDate(now.getDate() - 1);
+            confirmMessage = 'Logs de las últimas 24 horas';
+            break;
+        case '7d':
+            cutoffDate.setDate(now.getDate() - 7);
+            confirmMessage = 'Logs de los últimos 7 días';
+            break;
+        case '4w':
+            cutoffDate.setDate(now.getDate() - 28);
+            confirmMessage = 'Logs de las últimas 4 semanas';
+            break;
+        case 'all':
+            cutoffDate = new Date(0); // 1 de enero de 1970
+            confirmMessage = 'TODOS los logs históricos';
+            break;
+        default:
+            showToast('Error', 'Período de tiempo no válido', 'error');
+            return;
+    }
+    
+    // Confirmar con el usuario antes de proceder
+    if (!confirm(`¿Está seguro que desea borrar ${confirmMessage}? Esta acción no se puede deshacer.`)) {
+        return;
+    }
+    
+    // Llamar a la API para borrar los logs
+    fetch('/api/logs/delete', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            cutoffDate: cutoffDate.toISOString(),
+            timePeriod
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        // Actualizar los logs en memoria
+        collections.forEach(collection => {
+            // Filtrar logs para mantener solo los anteriores a la fecha de corte
+            if (timePeriod === 'all') {
+                // Si es "desde siempre", borrar todos
+                appState.logs.data[collection] = [];
+            } else {
+                // Filtrar por fecha
+                appState.logs.data[collection] = appState.logs.data[collection].filter(log => {
+                    const logDate = new Date(log.timestamp);
+                    return logDate < cutoffDate;
+                });
+            }
+            
+            // Actualizar la visualización
+            const wrapper = document.getElementById(`${collection}-logs-content-wrapper`);
+            if (wrapper) {
+                if (appState.logs.data[collection].length === 0) {
+                    wrapper.innerHTML = '<div class="text-center text-muted p-3">No hay logs disponibles</div>';
+                } else {
+                    updateLogDisplay();
+                }
+            }
+        });
+        
+        // Mostrar mensaje de confirmación
+        showToast(
+            'Logs Borrados', 
+            `Se han borrado ${data.count || 'los'} logs según el criterio seleccionado`, 
+            'success'
+        );
+    })
+    .catch(error => {
+        console.error('Error al borrar logs:', error);
+        showToast('Error', `No se pudieron borrar los logs: ${error.message}`, 'error');
+    });
+}

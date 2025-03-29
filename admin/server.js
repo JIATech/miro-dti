@@ -20,6 +20,15 @@ const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/intercom';
 
+// Configuración de política de retención de datos para tablets
+const DEFAULT_RETENTION_POLICY = {
+    callHistory: 60,     // 60 días para historial de llamadas
+    standardLogs: 14,    // 14 días para logs estándar
+    errorLogs: 30,       // 30 días para logs de errores
+    detailedMetrics: 7,  // 7 días para métricas detalladas
+    aggregatedMetrics: 30 // 30 días para métricas agregadas
+};
+
 // Asegurar que existe el directorio de logs
 if (!fs.existsSync(LOG_DIR)) {
     fs.mkdirSync(LOG_DIR, { recursive: true });
@@ -56,52 +65,53 @@ mongoose.connect(MONGO_URI, {
     logger.error('Error al conectar a MongoDB:', err);
 });
 
-// Esquema para almacenar datos de tablets
-const tabletSchema = new mongoose.Schema({
+// Esquemas y Modelos
+const TabletSchema = new mongoose.Schema({
     deviceName: { type: String, required: true, unique: true },
     deviceType: { type: String, required: true },
+    status: { type: String, default: 'offline' },
     lastSeen: { type: Date, default: Date.now },
-    totalCalls: { type: Number, default: 0 },
-    callDuration: { type: Number, default: 0 }, // En segundos
-    callsSuccess: { type: Number, default: 0 },
-    callsFailed: { type: Number, default: 0 },
-    batteryLevel: { type: Number },
-    networkType: { type: String },
-    networkStrength: { type: Number },
-    diskSpace: { type: Object },
-    memoryUsage: { type: Object },
-    audioSettings: { type: Object },
-    videoSettings: { type: Object },
-    errors: [{ 
-        timestamp: Date,
-        errorType: String,
-        message: String,
-        details: Object
-    }],
-    logs: [{ 
-        timestamp: Date,
-        level: String, 
-        message: String,
-        details: Object
-    }]
+    lastSync: { type: Date },
+    ipAddress: { type: String },
+    metrics: { type: Object, default: {} },
+    logs: { type: Array, default: [] },
+    callHistory: { type: Array, default: [] }
 });
 
-// Limitar la cantidad de logs almacenados
-tabletSchema.pre('save', function(next) {
-    // Mantener solo los últimos 100 logs
-    if (this.logs && this.logs.length > 100) {
-        this.logs = this.logs.slice(-100);
-    }
-    
-    // Mantener solo los últimos 50 errores
-    if (this.errors && this.errors.length > 50) {
-        this.errors = this.errors.slice(-50);
-    }
-    
-    next();
+// Esquema para políticas de retención de datos
+const RetentionPolicySchema = new mongoose.Schema({
+    name: { type: String, required: true, unique: true, default: 'default' },
+    callHistory: { type: Number, default: 60 },     // días
+    standardLogs: { type: Number, default: 14 },    // días
+    errorLogs: { type: Number, default: 30 },       // días
+    detailedMetrics: { type: Number, default: 7 },  // días
+    aggregatedMetrics: { type: Number, default: 30 }, // días
+    lastUpdated: { type: Date, default: Date.now },
+    createdBy: { type: String }
 });
 
-const Tablet = mongoose.model('Tablet', tabletSchema);
+const Tablet = mongoose.model('Tablet', TabletSchema);
+const RetentionPolicy = mongoose.model('RetentionPolicy', RetentionPolicySchema);
+
+// Verificar si existe una política de retención por defecto, si no, crearla
+const initDefaultRetentionPolicy = async () => {
+    try {
+        const defaultPolicy = await RetentionPolicy.findOne({ name: 'default' });
+        if (!defaultPolicy) {
+            logger.info('Creando política de retención por defecto');
+            const newPolicy = new RetentionPolicy({
+                name: 'default',
+                ...DEFAULT_RETENTION_POLICY,
+                createdBy: 'system'
+            });
+            await newPolicy.save();
+        }
+    } catch (error) {
+        logger.error('Error al crear política de retención por defecto', { error: error.message });
+    }
+};
+
+initDefaultRetentionPolicy();
 
 // Inicialización de servidor Express
 const app = express();
@@ -113,9 +123,31 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '5mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Archivo de configuración para almacenar la contraseña de administrador
+const CONFIG_FILE = path.join(__dirname, 'config.json');
+
+// Cargar o crear la configuración
+let adminConfig = { username: ADMIN_USER, password: ADMIN_PASSWORD };
+try {
+    if (fs.existsSync(CONFIG_FILE)) {
+        const configData = fs.readFileSync(CONFIG_FILE, 'utf8');
+        const storedConfig = JSON.parse(configData);
+        if (storedConfig.username && storedConfig.password) {
+            adminConfig = storedConfig;
+            logger.info('Configuración de administrador cargada correctamente.');
+        }
+    } else {
+        // Crear archivo de configuración inicial
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(adminConfig, null, 2));
+        logger.info('Archivo de configuración de administrador creado con valores predeterminados.');
+    }
+} catch (error) {
+    logger.error('Error al cargar la configuración de administrador:', error);
+}
+
 // Configuración de seguridad
 app.use(basicAuth({
-    users: { [ADMIN_USER]: ADMIN_PASSWORD },
+    users: { [adminConfig.username]: adminConfig.password },
     challenge: true,
     realm: 'Sistema Intercom - Panel de Administración'
 }));
@@ -444,6 +476,284 @@ app.get('/api/tablets/:deviceName/errors', async (req, res) => {
     }
 });
 
+app.post('/api/admin/change-password', async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'Faltan datos requeridos (oldPassword, newPassword)'
+            });
+        }
+        
+        if (adminConfig.password !== oldPassword) {
+            return res.status(401).json({
+                success: false,
+                message: 'Contraseña actual incorrecta'
+            });
+        }
+        
+        adminConfig.password = newPassword;
+        
+        // Guardar cambios en el archivo de configuración
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(adminConfig, null, 2));
+        
+        return res.json({
+            success: true,
+            message: 'Contraseña actualizada correctamente'
+        });
+    } catch (error) {
+        logger.error('Error al cambiar la contraseña de administrador:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al cambiar la contraseña',
+            error: error.message
+        });
+    }
+});
+
+// Rutas para políticas de retención
+app.get('/api/retention-policies', async (req, res) => {
+    try {
+        const policies = await RetentionPolicy.find();
+        return res.json({
+            success: true,
+            policies
+        });
+    } catch (error) {
+        logger.error('Error al obtener políticas de retención:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al obtener políticas de retención',
+            error: error.message
+        });
+    }
+});
+
+app.get('/api/retention-policies/:name', async (req, res) => {
+    try {
+        const { name } = req.params;
+        const policy = await RetentionPolicy.findOne({ name });
+        
+        if (!policy) {
+            return res.status(404).json({
+                success: false,
+                message: 'Política de retención no encontrada'
+            });
+        }
+        
+        return res.json({
+            success: true,
+            policy
+        });
+    } catch (error) {
+        logger.error('Error al obtener política de retención:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al obtener política de retención',
+            error: error.message
+        });
+    }
+});
+
+app.post('/api/retention-policies', async (req, res) => {
+    try {
+        const { name, callHistory, standardLogs, errorLogs, detailedMetrics, aggregatedMetrics } = req.body;
+        
+        if (!name || !callHistory || !standardLogs || !errorLogs || !detailedMetrics || !aggregatedMetrics) {
+            return res.status(400).json({
+                success: false,
+                message: 'Faltan datos requeridos para crear política de retención'
+            });
+        }
+        
+        const policy = new RetentionPolicy({
+            name,
+            callHistory,
+            standardLogs,
+            errorLogs,
+            detailedMetrics,
+            aggregatedMetrics,
+            createdBy: 'admin'
+        });
+        
+        await policy.save();
+        
+        return res.json({
+            success: true,
+            message: 'Política de retención creada correctamente'
+        });
+    } catch (error) {
+        logger.error('Error al crear política de retención:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al crear política de retención',
+            error: error.message
+        });
+    }
+});
+
+app.put('/api/retention-policies/:name', async (req, res) => {
+    try {
+        const { name } = req.params;
+        const { callHistory, standardLogs, errorLogs, detailedMetrics, aggregatedMetrics } = req.body;
+        
+        if (!callHistory || !standardLogs || !errorLogs || !detailedMetrics || !aggregatedMetrics) {
+            return res.status(400).json({
+                success: false,
+                message: 'Faltan datos requeridos para actualizar política de retención'
+            });
+        }
+        
+        const policy = await RetentionPolicy.findOneAndUpdate({ name }, {
+            callHistory,
+            standardLogs,
+            errorLogs,
+            detailedMetrics,
+            aggregatedMetrics,
+            lastUpdated: Date.now()
+        }, { new: true });
+        
+        if (!policy) {
+            return res.status(404).json({
+                success: false,
+                message: 'Política de retención no encontrada'
+            });
+        }
+        
+        return res.json({
+            success: true,
+            message: 'Política de retención actualizada correctamente'
+        });
+    } catch (error) {
+        logger.error('Error al actualizar política de retención:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al actualizar política de retención',
+            error: error.message
+        });
+    }
+});
+
+app.delete('/api/retention-policies/:name', async (req, res) => {
+    try {
+        const { name } = req.params;
+        
+        await RetentionPolicy.findOneAndDelete({ name });
+        
+        return res.json({
+            success: true,
+            message: 'Política de retención eliminada correctamente'
+        });
+    } catch (error) {
+        logger.error('Error al eliminar política de retención:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al eliminar política de retención',
+            error: error.message
+        });
+    }
+});
+
+// Endpoint para forzar limpieza en una o todas las tablets
+app.post('/api/tablets/clean-data', async (req, res) => {
+    try {
+        const { deviceName, policyOverride } = req.body;
+        
+        // Obtener la política de retención actual
+        const retentionPolicy = await RetentionPolicy.findOne({ name: 'default' });
+        if (!retentionPolicy) {
+            return res.status(404).json({
+                success: false,
+                message: 'No se encontró la política de retención por defecto'
+            });
+        }
+        
+        // Determinar la política a usar (por defecto o override)
+        const policy = policyOverride || {
+            callHistory: retentionPolicy.callHistory,
+            standardLogs: retentionPolicy.standardLogs,
+            errorLogs: retentionPolicy.errorLogs,
+            detailedMetrics: retentionPolicy.detailedMetrics,
+            aggregatedMetrics: retentionPolicy.aggregatedMetrics
+        };
+        
+        // Si se especifica un dispositivo, limpiar solo ese
+        if (deviceName) {
+            const tablet = await Tablet.findOne({ deviceName });
+            if (!tablet) {
+                return res.status(404).json({
+                    success: false,
+                    message: `No se encontró la tablet con nombre: ${deviceName}`
+                });
+            }
+            
+            // Emitir evento a esa tablet específica
+            io.to(`tablet:${deviceName}`).emit('tablet:clean-data', {
+                policy,
+                requestedAt: new Date(),
+                requestedBy: 'admin-manual'
+            });
+            
+            logger.info(`Solicitud de limpieza manual enviada a tablet: ${deviceName}`);
+            
+            return res.json({
+                success: true,
+                message: `Solicitud de limpieza enviada a tablet: ${deviceName}`
+            });
+        } 
+        // Si no se especifica dispositivo, limpiar todas
+        else {
+            // Emitir evento a todas las tablets
+            io.emit('tablet:clean-data', {
+                policy,
+                requestedAt: new Date(),
+                requestedBy: 'admin-manual'
+            });
+            
+            logger.info('Solicitud de limpieza manual enviada a todas las tablets');
+            
+            return res.json({
+                success: true,
+                message: 'Solicitud de limpieza enviada a todas las tablets'
+            });
+        }
+    } catch (error) {
+        logger.error('Error al solicitar limpieza de datos:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al solicitar limpieza de datos',
+            error: error.message
+        });
+    }
+});
+
+// Endpoint para ver estado de almacenamiento de tablets
+app.get('/api/tablets/storage-status', async (req, res) => {
+    try {
+        const tablets = await Tablet.find({}, 'deviceName deviceType metrics.storage metrics.lastCleanup');
+        
+        return res.json({
+            success: true,
+            tablets: tablets.map(tablet => ({
+                deviceName: tablet.deviceName,
+                deviceType: tablet.deviceType,
+                storageUsed: tablet.metrics?.storage?.used || 'N/A',
+                storageTotal: tablet.metrics?.storage?.total || 'N/A',
+                lastCleanup: tablet.metrics?.lastCleanup || null
+            }))
+        });
+    } catch (error) {
+        logger.error('Error al obtener estado de almacenamiento:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al obtener estado de almacenamiento',
+            error: error.message
+        });
+    }
+});
+
 // Captura de ruta por defecto para la SPA
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -490,6 +800,35 @@ cron.schedule('0 0 * * *', async () => {  // A la medianoche
             type: 'error',
             message: `Error en limpieza automática de logs: ${error.message}`
         });
+    }
+});
+
+// Programar limpieza de datos en tablets cada noche
+cron.schedule('0 2 * * *', async () => {  // A las 2 AM 
+    logger.info('Iniciando notificación de limpieza programada para tablets');
+    
+    try {
+        // Obtener la política de retención actual
+        const retentionPolicy = await RetentionPolicy.findOne({ name: 'default' });
+        if (!retentionPolicy) {
+            throw new Error('No se encontró la política de retención por defecto');
+        }
+        
+        // Enviar mensaje a todas las tablets conectadas para iniciar limpieza
+        io.emit('tablet:clean-data', {
+            policy: {
+                callHistory: retentionPolicy.callHistory,
+                standardLogs: retentionPolicy.standardLogs,
+                errorLogs: retentionPolicy.errorLogs,
+                detailedMetrics: retentionPolicy.detailedMetrics,
+                aggregatedMetrics: retentionPolicy.aggregatedMetrics
+            },
+            requestedAt: new Date()
+        });
+        
+        logger.info('Notificación de limpieza enviada a todas las tablets');
+    } catch (error) {
+        logger.error('Error al programar limpieza de tablets', { error: error.message });
     }
 });
 
@@ -583,7 +922,7 @@ async function restartService(serviceName) {
         
         return { success: true };
     } catch (error) {
-        logger.error(`Error al reiniciar ${serviceName}`, { error: error.message });
+        logger.error(`Error al reiniciar servicio ${serviceName}`, { error: error.message });
         throw new Error(`Error al reiniciar ${serviceName}: ${error.message}`);
     }
 }
