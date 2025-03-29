@@ -46,8 +46,19 @@ jobs:
               echo "WORKDIR /src" >> mirotalksfu/Dockerfile
               echo "ENV MEDIASOUP_SKIP_WORKER_PREBUILT_DOWNLOAD=true" >> mirotalksfu/Dockerfile
               echo "RUN apt-get update && apt-get install -y --no-install-recommends build-essential python3 python3-pip ffmpeg wget && rm -rf /var/lib/apt/lists/*" >> mirotalksfu/Dockerfile
+              
+              # Primero copiar package*.json para aprovechar el caché de Docker
+              echo "COPY package*.json ./" >> mirotalksfu/Dockerfile
+              
+              # Usar npm ci en lugar de npm install para garantizar instalaciones deterministas
+              echo "RUN npm ci" >> mirotalksfu/Dockerfile
+              
+              # Luego copiar el resto del código fuente
               echo "COPY . ." >> mirotalksfu/Dockerfile
-              echo "RUN npm install" >> mirotalksfu/Dockerfile
+              
+              # Crear directorios necesarios
+              echo "RUN mkdir -p app/rec app/logs" >> mirotalksfu/Dockerfile
+              
               echo "EXPOSE 3010" >> mirotalksfu/Dockerfile
               echo "CMD [\"npm\", \"start\"]" >> mirotalksfu/Dockerfile
               echo "Dockerfile básico creado en mirotalksfu/"
