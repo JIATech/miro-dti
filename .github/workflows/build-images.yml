@@ -14,6 +14,50 @@ jobs:
         with:
           fetch-depth: 0
       
+      # Verificar archivos necesarios en cada directorio
+      - name: Verify necessary files
+        run: |
+          echo "Verificando archivos necesarios en cada directorio..."
+          
+          # Comprobar PWA
+          if [ -d "pwa" ]; then
+            echo "Verificando directorio pwa..."
+            if [ ! -f "pwa/package.json" ]; then
+              echo "ADVERTENCIA: No se encontró package.json en pwa"
+              touch pwa/package.json
+            fi
+            if [ ! -f "pwa/package-lock.json" ]; then
+              echo "ADVERTENCIA: No se encontró package-lock.json en pwa"
+              echo "{}" > pwa/package-lock.json
+            fi
+          fi
+          
+          # Comprobar Signaling
+          if [ -d "signaling" ]; then
+            echo "Verificando directorio signaling..."
+            if [ ! -f "signaling/package.json" ]; then
+              echo "ADVERTENCIA: No se encontró package.json en signaling"
+              touch signaling/package.json
+            fi
+            if [ ! -f "signaling/package-lock.json" ]; then
+              echo "ADVERTENCIA: No se encontró package-lock.json en signaling"
+              echo "{}" > signaling/package-lock.json
+            fi
+          fi
+          
+          # Comprobar Admin
+          if [ -d "admin" ]; then
+            echo "Verificando directorio admin..."
+            if [ ! -f "admin/package.json" ]; then
+              echo "ADVERTENCIA: No se encontró package.json en admin"
+              touch admin/package.json
+            fi
+            if [ ! -f "admin/package-lock.json" ]; then
+              echo "ADVERTENCIA: No se encontró package-lock.json en admin"
+              echo "{}" > admin/package-lock.json
+            fi
+          fi
+      
       # Verificar y corregir el directorio mirotalksfu
       - name: Check mirotalksfu directory
         run: |
