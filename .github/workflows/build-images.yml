@@ -11,15 +11,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
-      
-      - name: Install Docker Compose
-        run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-          docker-compose --version
       
       - name: Login to Docker Hub
         uses: docker/login-action@v2
@@ -27,7 +23,34 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
       
-      - name: Build and push images
-        run: |
-          docker-compose build
-          docker-compose push
+      # Construir y publicar PWA
+      - name: Build and push PWA image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./pwa
+          push: true
+          tags: dtiteam/intercom-pwa:latest
+      
+      # Construir y publicar Signaling
+      - name: Build and push Signaling image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./signaling
+          push: true
+          tags: dtiteam/intercom-signaling:latest
+      
+      # Construir y publicar Admin
+      - name: Build and push Admin image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./admin
+          push: true
+          tags: dtiteam/intercom-admin:latest
+      
+      # Construir y publicar MiroTalkSFU
+      - name: Build and push MiroTalkSFU image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./mirotalksfu
+          push: true
+          tags: dtiteam/intercom-mirotalksfu:latest
