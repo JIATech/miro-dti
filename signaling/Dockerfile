@@ -9,10 +9,11 @@ LABEL description="DTI Intercom Signaling Server"
 WORKDIR /app
 
 # Copiar archivos de dependencias primero para aprovechar la caché de Docker
-COPY package*.json ./
+COPY package.json ./
+COPY package-lock.json ./
 
-# Instalar dependencias usando npm ci para una instalación determinista
-RUN npm ci --only=production && \
+# Instalar dependencias usando npm con fallback a npm install si npm ci falla
+RUN npm ci --only=production 2>/dev/null || npm install --only=production && \
     # Limpiar caché npm para reducir el tamaño de la imagen
     npm cache clean --force
 

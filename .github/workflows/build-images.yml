@@ -95,6 +95,9 @@ jobs:
           context: ./signaling
           push: true
           tags: dtiteam/intercom-signaling:latest
+          build-args: |
+            NODE_ENV=production
+          no-cache: false
       
       # Construir y publicar Admin
       - name: Build and push Admin image
