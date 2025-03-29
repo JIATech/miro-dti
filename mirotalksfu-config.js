@@ -11,14 +11,37 @@ const IS_DOCKER = fs.existsSync('/.dockerenv');
 
 // ###################################################################################################
 const ENVIRONMENT = process.env.NODE_ENV || 'production'; // Cambiado a production por defecto
-const PUBLIC_IP = process.env.SFU_PUBLIC_IP || ''; // SFU Public IP
-const LISTEN_IP = process.env.SFU_LISTEN_IP || '0.0.0.0'; // SFU listen IP
-const IPv4 = getIPv4(); // Determines the appropriate IPv4 address based on ENVIRONMENT
-// ###################################################################################################
 
-// Configuración de puertos WebRTC para nuestro sistema intercom
-const RTC_MIN_PORT = parseInt(process.env.SFU_MIN_PORT) || 40000;
-const RTC_MAX_PORT = parseInt(process.env.SFU_MAX_PORT) || 50000;
+// ============== CONFIGURACIÓN FALLBACK SFU ==============
+// Configuración del servidor local (dentro del edificio)
+const LOCAL_SFU_ENABLED = process.env.LOCAL_SFU_ENABLED === 'true' || true;  
+const LOCAL_SFU_IP = process.env.LOCAL_SFU_IP || ''; // IP del servidor local
+const LOCAL_SFU_PORT = parseInt(process.env.LOCAL_SFU_PORT) || 8080;
+const LOCAL_SFU_LISTEN_IP = process.env.LOCAL_SFU_LISTEN_IP || '0.0.0.0';
+const LOCAL_SFU_MIN_PORT = parseInt(process.env.LOCAL_SFU_MIN_PORT) || 40000;
+const LOCAL_SFU_MAX_PORT = parseInt(process.env.LOCAL_SFU_MAX_PORT) || 50000;
+
+// Configuración del servidor de fallback (internet)
+const FALLBACK_SFU_ENABLED = process.env.FALLBACK_SFU_ENABLED === 'true' || true;
+const FALLBACK_SFU_IP = process.env.FALLBACK_SFU_IP || ''; // IP/dominio del servidor fallback
+const FALLBACK_SFU_PORT = parseInt(process.env.FALLBACK_SFU_PORT) || 8080;
+const FALLBACK_SFU_LISTEN_IP = process.env.FALLBACK_SFU_LISTEN_IP || '0.0.0.0';
+const FALLBACK_SFU_MIN_PORT = parseInt(process.env.FALLBACK_SFU_MIN_PORT) || 40000;
+const FALLBACK_SFU_MAX_PORT = parseInt(process.env.FALLBACK_SFU_MAX_PORT) || 50000;
+
+// Configuración del mecanismo de fallback
+const FALLBACK_TIMEOUT_MS = parseInt(process.env.FALLBACK_TIMEOUT_MS) || 5000;
+const FALLBACK_MAX_RETRIES = parseInt(process.env.FALLBACK_MAX_RETRIES) || 3;
+
+// Configuración activa para este servidor
+// Nota: En producción, esta configuración inicial se utiliza,
+// pero la PWA determinará dinámicamente cuál servidor usar
+const PUBLIC_IP = process.env.SFU_PUBLIC_IP || LOCAL_SFU_IP || ''; 
+const LISTEN_IP = process.env.SFU_LISTEN_IP || LOCAL_SFU_LISTEN_IP;
+const RTC_MIN_PORT = parseInt(process.env.SFU_MIN_PORT) || LOCAL_SFU_MIN_PORT;
+const RTC_MAX_PORT = parseInt(process.env.SFU_MAX_PORT) || LOCAL_SFU_MAX_PORT;
+const IPv4 = getIPv4(); // Determina la dirección IPv4 apropiada según el entorno
+// ============================================================
 
 // Configuramos los workers para optimizar el rendimiento
 const NUM_CPUS = os.cpus().length;
@@ -28,6 +51,30 @@ const NUM_WORKERS = Math.min(process.env.SFU_NUM_WORKERS || NUM_CPUS, NUM_CPUS);
 const FFMPEG_PATH = process.env.FFMPEG_PATH || getFFmpegPath(PLATFORM);
 
 module.exports = {
+    // Configuración del sistema de fallback para que la PWA pueda elegir entre servidores
+    fallback: {
+        local: {
+            enabled: LOCAL_SFU_ENABLED,
+            ip: LOCAL_SFU_IP,
+            port: LOCAL_SFU_PORT,
+            listenIp: LOCAL_SFU_LISTEN_IP,
+            minPort: LOCAL_SFU_MIN_PORT,
+            maxPort: LOCAL_SFU_MAX_PORT
+        },
+        internet: {
+            enabled: FALLBACK_SFU_ENABLED,
+            ip: FALLBACK_SFU_IP,
+            port: FALLBACK_SFU_PORT,
+            listenIp: FALLBACK_SFU_LISTEN_IP,
+            minPort: FALLBACK_SFU_MIN_PORT,
+            maxPort: FALLBACK_SFU_MAX_PORT
+        },
+        settings: {
+            timeoutMs: FALLBACK_TIMEOUT_MS,
+            maxRetries: FALLBACK_MAX_RETRIES,
+            currentMode: 'local' // Modo inicial (local o internet)
+        }
+    },
     services: {
         ip: ['http://api.ipify.org', 'http://ipinfo.io/ip', 'http://ifconfig.me/ip'],
     },
@@ -109,7 +156,7 @@ module.exports = {
     },
     jwt: {
         key: process.env.JWT_KEY || 'intercom_jwt_secret',
-        exp: '24h', // Más tiempo para validez del token
+        exp: process.env.JWT_EXPIRATION || '365d', // 1 año para evitar relogueos frecuentes
     },
     oidc: {
         enabled: false, // Sin OpenID Connect

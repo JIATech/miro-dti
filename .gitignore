@@ -6,6 +6,8 @@ admin/logs
 signaling/node_modules
 pwa/node_modules
 .env
-.env.*
-!.env.example
+.env.develop
+.env.example
 .dev-pids
+signaling/.env
+mirotalksfu/.env

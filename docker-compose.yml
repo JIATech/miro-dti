@@ -4,6 +4,10 @@ networks:
   intercom-network:
     driver: bridge
 
+volumes:
+  mongodb_data:
+    driver: local
+
 services:
   pwa:
     build: 
@@ -18,6 +22,12 @@ services:
     depends_on:
       - signaling
       - mirotalksfu
+    environment:
+      - NODE_ENV=production
+      # Valores iniciales para PWA - Se pueden cambiar desde la interfaz
+      - LOCAL_SFU_URL=http://mirotalksfu:8080
+      - FALLBACK_SFU_URL=${FALLBACK_SFU_IP:-https://fallback-server.example.com:8080}
+      - SIGNALING_URL=http://signaling:3000
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:80"]
       interval: 30s
@@ -40,12 +50,17 @@ services:
     environment:
       - NODE_ENV=production
       - SIGNALING_PORT=3000
+      # Conexión con MongoDB
+      - MONGO_URI=mongodb://mongodb:27017/intercom
+      - MONGO_DB_NAME=intercom
       # Habilitar para conexión con la PWA
-      - CORS_ORIGIN=http://intercom-pwa
+      - CORS_ORIGIN=*
     ports:
       - "3000:3000"
     networks:
       - intercom-network
+    depends_on:
+      - mongodb
     volumes:
       - ./signaling/logs:/app/logs
     healthcheck:
@@ -69,14 +84,33 @@ services:
     restart: unless-stopped
     environment:
       - NODE_ENV=production
+      # Configuración de servidor local (predeterminado)
+      - LOCAL_SFU_ENABLED=true
+      - LOCAL_SFU_IP=${LOCAL_SFU_IP:-192.168.1.100}
+      - LOCAL_SFU_PORT=8080
+      - LOCAL_SFU_LISTEN_IP=0.0.0.0
+      - LOCAL_SFU_MIN_PORT=40000
+      - LOCAL_SFU_MAX_PORT=50000
+      # Configuración del servidor fallback (internet)
+      - FALLBACK_SFU_ENABLED=true
+      - FALLBACK_SFU_IP=${FALLBACK_SFU_IP:-CAMBIAR_A_IP_PÚBLICA}
+      - FALLBACK_SFU_PORT=8080
+      - FALLBACK_SFU_LISTEN_IP=0.0.0.0
+      - FALLBACK_SFU_MIN_PORT=40000
+      - FALLBACK_SFU_MAX_PORT=50000
+      # Parámetros para el fallback
+      - FALLBACK_TIMEOUT_MS=5000
+      - FALLBACK_MAX_RETRIES=3
+      # Compatibilidad con variables antiguas
       - SFU_PORT=8080
       - SFU_MIN_PORT=40000
       - SFU_MAX_PORT=50000
       - SFU_LISTEN_IP=0.0.0.0
-      # Para producción, configurar la IP pública del servidor
-      # - SFU_PUBLIC_IP=tu_ip_pública
-      - API_KEY_SECRET=intercom_api_secret
-      - JWT_KEY=intercom_jwt_secret
+      # Valores para configuración activa
+      - SFU_PUBLIC_IP=${LOCAL_SFU_IP:-192.168.1.100}
+      # Seguridad
+      - API_KEY_SECRET=${API_KEY_SECRET:-intercom_api_secret_change_this_in_production}
+      - JWT_KEY=${JWT_KEY:-intercom_jwt_secret_change_this_in_production}
     ports:
       - "8080:8080/tcp"
       - "40000-50000:40000-50000/udp"
@@ -86,7 +120,7 @@ services:
       # Persistencia para grabaciones (si se habilitan)
       - ./mirotalksfu/app/rec:/app/app/rec
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -97,3 +131,31 @@ services:
     #     limits:
     #       cpus: '2'
     #       memory: 2G
+
+  mongodb:
+    image: mongo:5.0
+    container_name: intercom-mongodb
+    restart: unless-stopped
+    command: mongod --wiredTigerCacheSizeGB 1.0 --bind_ip_all
+    networks:
+      - intercom-network
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - "27017:27017"
+    environment:
+      # Para entornos de producción, habilitar autenticación
+      # - MONGO_INITDB_ROOT_USERNAME=admin
+      # - MONGO_INITDB_ROOT_PASSWORD=secure_password_here
+      - MONGO_INITDB_DATABASE=intercom
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017/test --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1'
+    #       memory: 1G
