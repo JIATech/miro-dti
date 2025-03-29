@@ -144,7 +144,7 @@ El panel de administración ofrece monitorización centralizada:
 
 ```bash
 # Clonar repositorio
-git clone https://github.com/tu-organizacion/miro-dti.git
+git clone https://github.com/JIATech/miro-dti.git
 cd miro-dti
 
 # Desarrollo con contenedores
@@ -191,7 +191,7 @@ Para asegurarte de que la carpeta `mirotalksfu` contenga todo el código fuente 
 
 ```bash
 # Clonar el repositorio principal
-git clone https://github.com/tu-organizacion/miro-dti.git
+git clone https://github.com/JIATech/miro-dti.git
 cd miro-dti
 
 # Inicializar y actualizar el submódulo de MiroTalkSFU
