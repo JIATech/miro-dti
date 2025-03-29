@@ -47,10 +47,14 @@ jobs:
           push: true
           tags: dtiteam/intercom-admin:latest
       
-      # Construir y publicar MiroTalkSFU
+      # Construir y publicar MiroTalkSFU con opciones especiales
       - name: Build and push MiroTalkSFU image
         uses: docker/build-push-action@v4
         with:
           context: ./mirotalksfu
           push: true
           tags: dtiteam/intercom-mirotalksfu:latest
+          build-args: |
+            NODE_ENV=production
+            MEDIASOUP_SKIP_WORKER_PREBUILT_DOWNLOAD=true
+          no-cache: true
