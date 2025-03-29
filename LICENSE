@@ -1,0 +1,30 @@
+# Licencia Dual para el Proyecto Intercom DTI
+
+Este proyecto contiene componentes con diferentes licencias:
+
+## 1. Componentes de MiroTalkSFU
+
+Los componentes derivados de MiroTalkSFU (ubicados en el directorio "mirotalksfu") están cubiertos por la licencia GNU Affero General Public License (AGPL) versión 3.0.
+
+Copyright (C) 2023 Miroslav Pejic
+Copyright (C) 2025 DTI Team
+
+Este programa es software libre: puede redistribuirlo y/o modificarlo según los términos de la Licencia Pública General Affero GNU publicada por la Free Software Foundation, ya sea la versión 3 de la Licencia, o cualquier versión posterior.
+
+Este programa se distribuye con la esperanza de que sea útil, pero SIN NINGUNA GARANTÍA; sin siquiera la garantía implícita de COMERCIABILIDAD o IDONEIDAD PARA UN PROPÓSITO PARTICULAR. Consulte la Licencia Pública General Affero GNU para más detalles.
+
+Debería haber recibido una copia de la Licencia Pública General Affero GNU junto con este programa. Si no, consulte <https://www.gnu.org/licenses/>.
+
+## 2. Componentes Originales de DTI Intercom
+
+Los componentes originales desarrollados específicamente para este proyecto (incluyendo pero no limitado a los directorios "pwa", "admin", "signaling" y otros componentes originales) están cubiertos por la siguiente licencia:
+
+Copyright (C) 2025 DTI Team <j.arnaboldi@spb.gba.gov.ar>
+
+Se concede permiso, de forma gratuita, a cualquier persona que obtenga una copia de este software y los archivos de documentación asociados (el "Software"), para utilizar el Software sin restricciones, incluyendo, sin limitación, los derechos de uso, copia, modificación, fusión, publicación, distribución, sublicencia y/o venta de copias del Software, y para permitir a las personas a quienes se proporcione el Software hacer lo mismo, sujeto a las siguientes condiciones:
+
+1. El aviso de copyright anterior y este aviso de permiso se incluirán en todas las copias o partes sustanciales del Software.
+
+2. El uso del Software está limitado a los fines previstos por la Secretaría de Planificación Bioceánica de la Provincia de Buenos Aires y no puede ser utilizado para competir directamente con los servicios oficiales existentes sin autorización explícita.
+
+EL SOFTWARE SE PROPORCIONA "TAL CUAL", SIN GARANTÍA DE NINGÚN TIPO, EXPRESA O IMPLÍCITA, INCLUYENDO PERO NO LIMITADO A LAS GARANTÍAS DE COMERCIABILIDAD, IDONEIDAD PARA UN PROPÓSITO PARTICULAR Y NO INFRACCIÓN. EN NINGÚN CASO LOS AUTORES O TITULARES DE DERECHOS DE AUTOR SERÁN RESPONSABLES POR CUALQUIER RECLAMACIÓN, DAÑOS U OTRA RESPONSABILIDAD, YA SEA EN UNA ACCIÓN DE CONTRATO, AGRAVIO O DE OTRO TIPO, QUE SURJA DE, O EN CONEXIÓN CON EL SOFTWARE O EL USO U OTROS TRATOS EN EL SOFTWARE.
