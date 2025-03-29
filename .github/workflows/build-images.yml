@@ -167,6 +167,21 @@ jobs:
           cd mirotalksfu
           echo "Creando Dockerfile.github con modificaciones..."
           
+          # Verificar si existe package.json y package-lock.json
+          echo "Verificando archivos de dependencias..."
+          BASIC_PACKAGE_JSON='{"name":"mirotalksfu","version":"1.0.0","private":true}'
+          BASIC_PACKAGE_LOCK='{"name":"mirotalksfu","version":"1.0.0","lockfileVersion":2,"requires":true,"packages":{"":{"name":"mirotalksfu","version":"1.0.0"}}}'
+          
+          if [ ! -f "package.json" ] || [ ! -s "package.json" ]; then
+            echo "ADVERTENCIA: No se encontró package.json válido, creando uno temporal"
+            echo $BASIC_PACKAGE_JSON > package.json
+          fi
+          
+          if [ ! -f "package-lock.json" ] || [ ! -s "package-lock.json" ]; then
+            echo "ADVERTENCIA: No se encontró package-lock.json válido, creando uno temporal"
+            echo $BASIC_PACKAGE_LOCK > package-lock.json
+          fi
+          
           # Verificar patrones a reemplazar
           if grep -q "groupadd -r mirotalk -g 1000" Dockerfile; then
             echo "Modificando patrón de creación de grupo..."
@@ -179,6 +194,25 @@ jobs:
           if grep -q "useradd -u 1000 -r -g mirotalk" Dockerfile.github; then
             echo "Modificando patrón de creación de usuario..."
             sed -i 's/useradd -u 1000 -r -g mirotalk/getent passwd mirotalk || useradd -r -g mirotalk || useradd -r -g mirotalk/' Dockerfile.github
+          fi
+          
+          # Modificar cómo se manejan los archivos package.json y package-lock.json
+          # Primero hacemos backup del Dockerfile.github original
+          cp Dockerfile.github Dockerfile.github.bak
+          
+          # Reemplazar la instrucción COPY para los archivos package*.json si existe
+          if grep -q "COPY package\*.json" Dockerfile.github; then
+            echo "Modificando patrón COPY package*.json..."
+            sed -i 's/COPY package\*.json/# Crear package.json por defecto\nRUN echo '\''{"name":"mirotalksfu","version":"1.0.0","private":true}'\'' > \/src\/default-package.json\n\n# Copiar archivos de dependencias si existen\nCOPY package.json* .\/\nCOPY package-lock.json* .\/\nRUN if [ ! -s package.json ]; then cp default-package.json package.json; fi/' Dockerfile.github
+          fi
+          
+          # Reemplazar la instrucción RUN npm ci o npm install si existe
+          if grep -q "RUN npm ci" Dockerfile.github; then
+            echo "Modificando patrón RUN npm ci..."
+            sed -i 's/RUN npm ci/RUN if [ -f package-lock.json ] \&\& [ -s package-lock.json ]; then \\\n      npm ci || npm install; \\\n    else \\\n      npm install; \\\n    fi/' Dockerfile.github
+          elif grep -q "RUN npm install" Dockerfile.github; then
+            echo "Modificando patrón RUN npm install..."
+            sed -i 's/RUN npm install/RUN if [ -f package-lock.json ] \&\& [ -s package-lock.json ]; then \\\n      npm ci || npm install; \\\n    else \\\n      npm install; \\\n    fi/' Dockerfile.github
           fi
           
           echo "Contenido del Dockerfile.github:"
