@@ -47,11 +47,21 @@ jobs:
           push: true
           tags: dtiteam/intercom-admin:latest
       
-      # Construir y publicar MiroTalkSFU con opciones especiales
+      # Preparar Dockerfile temporal para MiroTalkSFU
+      - name: Prepare MiroTalkSFU Dockerfile
+        run: |
+          cd mirotalksfu
+          # Crear un Dockerfile.github temporal modificado que maneje el error de GID 1000
+          sed 's/groupadd -r mirotalk -g 1000/getent group mirotalk || groupadd -r mirotalk || groupadd -r mirotalk/' Dockerfile > Dockerfile.github
+          sed -i 's/useradd -u 1000 -r -g mirotalk/getent passwd mirotalk || useradd -r -g mirotalk || useradd -r -g mirotalk/' Dockerfile.github
+          cat Dockerfile.github
+      
+      # Construir y publicar MiroTalkSFU con el Dockerfile modificado
       - name: Build and push MiroTalkSFU image
         uses: docker/build-push-action@v4
         with:
           context: ./mirotalksfu
+          file: ./mirotalksfu/Dockerfile.github
           push: true
           tags: dtiteam/intercom-mirotalksfu:latest
           build-args: |
