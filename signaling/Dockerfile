@@ -18,9 +18,9 @@ RUN npm ci --only=production && \
 
 # Crear directorio de logs y garantizar permisos
 RUN mkdir -p /app/logs && \
-    # Crear usuario no-root para ejecutar la aplicación
-    addgroup -g 1000 appuser && \
-    adduser -u 1000 -G appuser -s /bin/sh -D appuser && \
+    # Crear usuario no-root para ejecutar la aplicación (comprobando primero si ya existe)
+    getent group appuser || addgroup -g 1000 appuser || addgroup appuser && \
+    getent passwd appuser || adduser -u 1000 -G appuser -s /bin/sh -D appuser || adduser -G appuser -s /bin/sh -D appuser && \
     # Establecer permisos
     chown -R appuser:appuser /app
 
