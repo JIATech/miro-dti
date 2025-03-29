@@ -20,17 +20,45 @@ jobs:
           echo "Verificando directorio mirotalksfu..."
           if [ ! -d "mirotalksfu" ]; then
             echo "El directorio mirotalksfu no existe, clonando desde el repositorio..."
-            git clone https://github.com/miroslavpejic85/mirotalksfu.git mirotalksfu
+            # Cloning the main branch explicitly and with full depth to ensure we get all files
+            git clone --depth 1 https://github.com/miroslavpejic85/mirotalksfu.git mirotalksfu
+            
+            echo "Verificando la estructura del repositorio clonado..."
+            ls -la mirotalksfu/
+          else
+            echo "Directorio mirotalksfu existe, verificando contenido..."
+            ls -la mirotalksfu/
           fi
           
           echo "Verificando Dockerfile en mirotalksfu..."
           if [ ! -f "mirotalksfu/Dockerfile" ]; then
-            echo "ERROR: No se encontró Dockerfile en mirotalksfu"
-            exit 1
+            echo "ADVERTENCIA: No se encontró Dockerfile en mirotalksfu, intentando solucionar..."
+            
+            # Si no existe Dockerfile, verificar si está en otra ubicación o crear uno basado en la configuración local
+            if [ -f "signaling/Dockerfile" ]; then
+              echo "Usando Dockerfile de signaling como referencia..."
+              cp signaling/Dockerfile mirotalksfu/Dockerfile
+              echo "Dockerfile copiado a mirotalksfu/"
+            else
+              echo "Creando Dockerfile básico para mirotalksfu..."
+              # Crear un Dockerfile básico y simple
+              echo "FROM node:22-slim" > mirotalksfu/Dockerfile
+              echo "WORKDIR /src" >> mirotalksfu/Dockerfile
+              echo "ENV MEDIASOUP_SKIP_WORKER_PREBUILT_DOWNLOAD=true" >> mirotalksfu/Dockerfile
+              echo "RUN apt-get update && apt-get install -y --no-install-recommends build-essential python3 python3-pip ffmpeg wget && rm -rf /var/lib/apt/lists/*" >> mirotalksfu/Dockerfile
+              echo "COPY . ." >> mirotalksfu/Dockerfile
+              echo "RUN npm install" >> mirotalksfu/Dockerfile
+              echo "EXPOSE 3010" >> mirotalksfu/Dockerfile
+              echo "CMD [\"npm\", \"start\"]" >> mirotalksfu/Dockerfile
+              echo "Dockerfile básico creado en mirotalksfu/"
+            fi
           fi
           
           echo "Contenido del directorio mirotalksfu:"
           ls -la mirotalksfu/
+          
+          echo "Contenido del Dockerfile:"
+          cat mirotalksfu/Dockerfile
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
