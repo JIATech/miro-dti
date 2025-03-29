@@ -13,6 +13,7 @@ services:
     build: 
       context: ./pwa
       dockerfile: Dockerfile
+    image: dtiteam/intercom-pwa:latest
     container_name: intercom-pwa
     restart: unless-stopped
     ports:
@@ -45,6 +46,7 @@ services:
     build: 
       context: ./signaling
       dockerfile: Dockerfile
+    image: dtiteam/intercom-signaling:latest
     container_name: intercom-signaling
     restart: unless-stopped
     environment:
@@ -80,6 +82,7 @@ services:
     build: 
       context: ./mirotalksfu
       dockerfile: Dockerfile
+    image: dtiteam/intercom-mirotalksfu:latest
     container_name: intercom-mirotalksfu
     restart: unless-stopped
     environment:
@@ -131,6 +134,46 @@ services:
     #     limits:
     #       cpus: '2'
     #       memory: 2G
+
+  admin:
+    build: 
+      context: ./admin
+      dockerfile: Dockerfile
+    image: dtiteam/intercom-admin:latest
+    container_name: intercom-admin
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - ADMIN_PORT=8090
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-securepassword}
+      - LOCAL_IP=${LOCAL_SFU_IP:-192.168.1.100}
+      # Conexión con MongoDB
+      - MONGO_URI=mongodb://mongodb:27017/intercom
+      - MONGO_DB_NAME=intercom
+    ports:
+      - "8090:8090"
+    networks:
+      - intercom-network
+    depends_on:
+      - mongodb
+      - pwa
+      - signaling
+      - mirotalksfu
+    volumes:
+      - ./admin/logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # En producción puedes habilitar límites de recursos
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.5'
+    #       memory: 512M
 
   mongodb:
     image: mongo:5.0
