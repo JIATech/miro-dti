@@ -178,3 +178,50 @@ Este sistema implementa:
    - Se recomienda habilitar autenticación en MongoDB
    - Implementar HTTPS con certificados válidos
    - Configurar firewall con puertos específicos
+
+## Desarrollo Avanzado
+
+### Gestión de MiroTalkSFU como Submódulo Git
+
+MiroTalkSFU se gestiona como un submódulo Git para mantener la referencia al repositorio original mientras se permite su integración con este proyecto. Esto asegura que los desarrolladores puedan acceder al código fuente completo y actualizado.
+
+#### Para quienes clonan este repositorio:
+
+Para asegurarte de que la carpeta `mirotalksfu` contenga todo el código fuente después de clonar el repositorio, ejecuta:
+
+```bash
+# Clonar el repositorio principal
+git clone https://github.com/tu-organizacion/miro-dti.git
+cd miro-dti
+
+# Inicializar y actualizar el submódulo de MiroTalkSFU
+git submodule update --init --recursive
+```
+
+Este comando descargará automáticamente el código fuente original de MiroTalkSFU en la carpeta correspondiente.
+
+#### Configuración del submódulo:
+
+MiroTalkSFU ya está configurado como submódulo Git en este repositorio. No es necesario realizar ninguna configuración adicional para utilizarlo.
+
+#### Actualización del submódulo a versiones más recientes:
+
+Para actualizar el submódulo a la última versión del repositorio original:
+
+```bash
+# Entrar al directorio del submódulo
+cd mirotalksfu
+
+# Cambiar a la rama principal y actualizar
+git checkout main
+git pull origin main
+
+# Volver al directorio raíz y confirmar la actualización
+cd ..
+git add mirotalksfu
+git commit -m "Actualizar submódulo MiroTalkSFU a la última versión"
+```
+
+#### Personalizaciones sobre MiroTalkSFU
+
+Las personalizaciones específicas para el sistema Intercom DTI deben gestionarse cuidadosamente para facilitar futuras actualizaciones del submódulo. Se recomienda documentar todos los cambios realizados sobre la versión original.
