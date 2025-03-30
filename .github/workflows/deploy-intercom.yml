@@ -75,7 +75,7 @@ jobs:
         run: npm run coverage
 
       - name: Subir informe de cobertura como artefacto
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage-combined
@@ -211,7 +211,7 @@ jobs:
           echo "DEPLOYED_BY=GitHub Actions" >> staging-deploy.log
           
       - name: Subir informe de despliegue
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: staging-deployment-logs
           path: staging-deploy.log
@@ -236,7 +236,7 @@ jobs:
           echo "ENVIRONMENT=Production" >> production-deploy.log
           
       - name: Subir informe de despliegue
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: production-deployment-logs
           path: production-deploy.log
