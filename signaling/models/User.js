@@ -1,6 +1,6 @@
 /**
  * Modelo de Usuario para el sistema Intercom DTI
- * 
+ *
  * Define la estructura de los usuarios en MongoDB
  * y métodos relacionados con la autenticación
  */
@@ -16,81 +16,83 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
     trim: true,
-    lowercase: true
+    lowercase: true,
   },
   password: {
     type: String,
-    required: true
+    required: true,
   },
   displayName: {
     type: String,
-    required: true
+    required: true,
   },
   role: {
     type: String,
     enum: ['portero', 'administracion', 'sistemas', 'infraestructura', 'soporte'],
-    required: true
+    required: true,
   },
   allowedRooms: {
     type: [String],
-    default: ['*'] // * significa todos los rooms permitidos
+    default: ['*'], // * significa todos los rooms permitidos
   },
   isActive: {
     type: Boolean,
-    default: true
+    default: true,
   },
   lastLogin: {
     type: Date,
-    default: null
+    default: null,
   },
   settings: {
     type: Object,
     default: {
       audio: true,
       video: true,
-      notifications: true
-    }
+      notifications: true,
+    },
   },
   authorizedDevices: {
-    type: [{
-      deviceId: String,
-      androidId: String,
-      source: String,
-      manufacturer: String,
-      model: String,
-      fingerprint: String,
-      uuid: String,
-      userAgent: String,
-      ipAddress: String,
-      autoLogin: {
-        type: Boolean,
-        default: true
+    type: [
+      {
+        deviceId: String,
+        androidId: String,
+        source: String,
+        manufacturer: String,
+        model: String,
+        fingerprint: String,
+        uuid: String,
+        userAgent: String,
+        ipAddress: String,
+        autoLogin: {
+          type: Boolean,
+          default: true,
+        },
+        lastUsed: Date,
+        firstRegistered: {
+          type: Date,
+          default: Date.now,
+        },
       },
-      lastUsed: Date,
-      firstRegistered: {
-        type: Date,
-        default: Date.now
-      }
-    }],
-    default: []
+    ],
+    default: [],
   },
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
 // Middleware pre-save para encriptar contraseña
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function (next) {
   const user = this;
-  
+
   // Solo encriptar si la contraseña ha sido modificada o es nueva
   if (!user.isModified('password')) return next();
-  
+
   try {
     // Generar salt
     const salt = await bcrypt.genSalt(10);
@@ -103,7 +105,7 @@ userSchema.pre('save', async function(next) {
 });
 
 // Método para comparar contraseñas
-userSchema.methods.comparePassword = async function(candidatePassword) {
+userSchema.methods.comparePassword = async function (candidatePassword) {
   try {
     return await bcrypt.compare(candidatePassword, this.password);
   } catch (error) {
@@ -112,18 +114,18 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
 };
 
 // Método para generar token JWT
-userSchema.methods.generateAuthToken = function() {
+userSchema.methods.generateAuthToken = function () {
   const token = jwt.sign(
-    { 
+    {
       id: this._id,
       username: this.username,
       role: this.role,
-      displayName: this.displayName
+      displayName: this.displayName,
     },
     process.env.JWT_KEY || 'intercom_jwt_secret',
     { expiresIn: process.env.JWT_EXPIRATION || '365d' }
   );
-  
+
   return token;
 };
 

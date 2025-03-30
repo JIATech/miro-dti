@@ -13,13 +13,13 @@ global.IntercomDB = {
   getCallHistory: jest.fn().mockResolvedValue([]),
   getSetting: jest.fn().mockResolvedValue(null),
   saveSetting: jest.fn().mockResolvedValue(true),
-  saveDeviceInfo: jest.fn().mockResolvedValue(true)
+  saveDeviceInfo: jest.fn().mockResolvedValue(true),
 };
 
 global.IntercomSync = {
   init: jest.fn().mockResolvedValue({}),
   syncData: jest.fn().mockResolvedValue(true),
-  setAdminServer: jest.fn().mockResolvedValue(true)
+  setAdminServer: jest.fn().mockResolvedValue(true),
 };
 
 // Setup console mocks to prevent cluttering test output
@@ -29,5 +29,5 @@ global.console = {
   info: jest.fn(),
   debug: jest.fn(),
   warn: jest.fn(),
-  error: jest.fn()
+  error: jest.fn(),
 };

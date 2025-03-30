@@ -1,6 +1,6 @@
 /**
  * Servidor de Señalización para Sistema Intercom DTI
- * 
+ *
  * Este servidor maneja las conexiones WebSocket para coordinar
  * las llamadas entre diferentes dispositivos utilizando WebRTC.
  * También proporciona API REST para autenticación de usuarios.
@@ -28,7 +28,7 @@ app.use(cors());
 app.use(express.json()); // Parser para solicitudes JSON
 app.use(express.urlencoded({ extended: true })); // Parser para formularios
 
-// Opcional: Servir la PWA 
+// Opcional: Servir la PWA
 app.use(express.static(path.join(__dirname, '../pwa')));
 
 // Rutas de API
@@ -38,8 +38,8 @@ app.use('/api/auth', authRoutes);
 const io = new Server(server, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST']
-  }
+    methods: ['GET', 'POST'],
+  },
 });
 
 // Almacenamiento en memoria de dispositivos conectados
@@ -50,17 +50,17 @@ const activeRooms = new Map();
 async function startServer() {
   // Conectar a MongoDB
   const dbConnected = await connectDB();
-  
+
   if (dbConnected) {
     // Inicializar la base de datos con usuarios predeterminados
     await initializeDatabase();
-    
+
     // Iniciar el servidor HTTP
     const PORT = process.env.SIGNALING_PORT || 3000;
     server.listen(PORT, () => {
       console.log(`🚀 Servidor de señalización ejecutándose en puerto ${PORT}`);
     });
-    
+
     // Configurar manejo de conexiones WebSocket
     setupSocketHandlers();
   } else {
@@ -76,61 +76,64 @@ function setupSocketHandlers() {
     // Registro de dispositivo
     socket.on('register', ({ deviceName, deviceType }) => {
       console.log(`📱 Dispositivo registrado: ${deviceName} (${deviceType})`);
-      
+
       // Guardar info del dispositivo
       devices.set(deviceName, {
         socketId: socket.id,
         deviceType,
-        status: 'available'
+        status: 'available',
       });
 
       socket.join(deviceName);
-      
+
       // Notificar a todos los dispositivos la lista actualizada
-      io.emit('deviceList', Array.from(devices.keys()).map(name => ({
-        name,
-        type: devices.get(name).deviceType,
-        status: devices.get(name).status
-      })));
+      io.emit(
+        'deviceList',
+        Array.from(devices.keys()).map((name) => ({
+          name,
+          type: devices.get(name).deviceType,
+          status: devices.get(name).status,
+        }))
+      );
     });
 
     // Solicitud de llamada
     socket.on('callRequest', ({ from, to, roomId }) => {
       console.log(`📞 Solicitud de llamada: ${from} -> ${to}`);
-      
+
       const targetDevice = devices.get(to);
-      
+
       if (!targetDevice) {
-        socket.emit('callError', { 
+        socket.emit('callError', {
           message: 'Dispositivo no disponible',
-          code: 'DEVICE_NOT_FOUND'
+          code: 'DEVICE_NOT_FOUND',
         });
         return;
       }
-      
+
       if (targetDevice.status !== 'available') {
-        socket.emit('callError', { 
+        socket.emit('callError', {
           message: 'Dispositivo ocupado',
-          code: 'DEVICE_BUSY'
+          code: 'DEVICE_BUSY',
         });
         return;
       }
-      
+
       // Actualizar estado de los dispositivos
       devices.get(from).status = 'calling';
       targetDevice.status = 'ringing';
-      
+
       // Crear sala para la llamada
       const room = roomId || `${from}-${to}-${Date.now()}`;
       activeRooms.set(room, { from, to, startTime: Date.now() });
-      
+
       // Notificar al destinatario
-      io.to(to).emit('incomingCall', { 
-        from, 
+      io.to(to).emit('incomingCall', {
+        from,
         room,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
-      
+
       // Actualizar lista de dispositivos
       updateDeviceList();
     });
@@ -138,38 +141,38 @@ function setupSocketHandlers() {
     // Respuesta a llamada
     socket.on('callAnswer', ({ room, answer }) => {
       console.log(`📞 Respuesta a llamada en sala ${room}: ${answer ? 'Aceptada' : 'Rechazada'}`);
-      
+
       const roomData = activeRooms.get(room);
-      
+
       if (!roomData) {
-        socket.emit('callError', { 
+        socket.emit('callError', {
           message: 'Sala de llamada no encontrada',
-          code: 'ROOM_NOT_FOUND'
+          code: 'ROOM_NOT_FOUND',
         });
         return;
       }
-      
+
       const { from, to } = roomData;
-      
+
       if (answer) {
         // Llamada aceptada
         devices.get(from).status = 'inCall';
         devices.get(to).status = 'inCall';
-        
+
         // Notificar a ambos participantes
         io.to(room).emit('callAccepted', { room });
       } else {
         // Llamada rechazada
         devices.get(from).status = 'available';
         devices.get(to).status = 'available';
-        
+
         // Notificar al llamante
         io.to(from).emit('callRejected', { room });
-        
+
         // Eliminar la sala
         activeRooms.delete(room);
       }
-      
+
       // Actualizar lista de dispositivos
       updateDeviceList();
     });
@@ -177,25 +180,25 @@ function setupSocketHandlers() {
     // Finalización de llamada
     socket.on('callHangup', ({ room }) => {
       console.log(`📞 Llamada finalizada en sala ${room}`);
-      
+
       const roomData = activeRooms.get(room);
-      
+
       if (!roomData) {
         return;
       }
-      
+
       const { from, to } = roomData;
-      
+
       // Actualizar estados
       if (devices.has(from)) devices.get(from).status = 'available';
       if (devices.has(to)) devices.get(to).status = 'available';
-      
+
       // Notificar a todos los participantes
       io.to(room).emit('callEnded', { room });
-      
+
       // Eliminar la sala
       activeRooms.delete(room);
-      
+
       // Actualizar lista de dispositivos
       updateDeviceList();
     });
@@ -205,14 +208,14 @@ function setupSocketHandlers() {
       io.to(to).emit('webrtcSignal', {
         room,
         signal,
-        from: socket.id
+        from: socket.id,
       });
     });
 
     // Desconexión
     socket.on('disconnect', () => {
       console.log('🔴 Cliente desconectado:', socket.id);
-      
+
       // Buscar y eliminar el dispositivo
       for (const [deviceName, device] of devices.entries()) {
         if (device.socketId === socket.id) {
@@ -220,25 +223,25 @@ function setupSocketHandlers() {
           for (const [room, roomData] of activeRooms.entries()) {
             if (roomData.from === deviceName || roomData.to === deviceName) {
               const otherParty = roomData.from === deviceName ? roomData.to : roomData.from;
-              
+
               if (devices.has(otherParty)) {
                 devices.get(otherParty).status = 'available';
-                io.to(otherParty).emit('callEnded', { 
+                io.to(otherParty).emit('callEnded', {
                   room,
-                  reason: 'PEER_DISCONNECTED'
+                  reason: 'PEER_DISCONNECTED',
                 });
               }
-              
+
               activeRooms.delete(room);
             }
           }
-          
+
           // Eliminar dispositivo
           devices.delete(deviceName);
-          
+
           // Actualizar lista de dispositivos
           updateDeviceList();
-          
+
           break;
         }
       }
@@ -248,11 +251,14 @@ function setupSocketHandlers() {
 
 // Función para actualizar la lista de dispositivos
 function updateDeviceList() {
-  io.emit('deviceList', Array.from(devices.keys()).map(name => ({
-    name,
-    type: devices.get(name).deviceType,
-    status: devices.get(name).status
-  })));
+  io.emit(
+    'deviceList',
+    Array.from(devices.keys()).map((name) => ({
+      name,
+      type: devices.get(name).deviceType,
+      status: devices.get(name).status,
+    }))
+  );
 }
 
 // Ruta para health check
@@ -265,7 +271,7 @@ app.get('/health', (req, res) => {
     uptime: process.uptime(),
     clients: io.engine.clientsCount,
     devices: devices.size,
-    activeRooms: activeRooms.size
+    activeRooms: activeRooms.size,
   });
 });
 

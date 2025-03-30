@@ -12,19 +12,19 @@ const config = {
   admin: {
     url: process.env.ADMIN_URL || 'http://localhost:8090',
     user: process.env.ADMIN_USER || 'admin',
-    password: process.env.ADMIN_PASSWORD || 'admin123'
+    password: process.env.ADMIN_PASSWORD || 'admin123',
   },
   mqtt: {
     broker: process.env.MQTT_BROKER || 'mqtt://localhost:1883',
     username: process.env.MQTT_USERNAME || 'intercom',
-    password: process.env.MQTT_PASSWORD || 'intercom123'
+    password: process.env.MQTT_PASSWORD || 'intercom123',
   },
   pwa: {
-    url: process.env.PWA_URL || 'http://localhost:3000'
-  }
+    url: process.env.PWA_URL || 'http://localhost:3000',
+  },
 };
 
-describe('Flujo de actualización extremo a extremo', function() {
+describe('Flujo de actualización extremo a extremo', function () {
   this.timeout(30000); // Las pruebas E2E pueden tomar tiempo
 
   let mqttClient;
@@ -32,11 +32,11 @@ describe('Flujo de actualización extremo a extremo', function() {
   let mqttMessages = [];
 
   // Antes de todas las pruebas
-  before(async function() {
+  before(async function () {
     // Iniciar cliente MQTT
     mqttClient = mqtt.connect(config.mqtt.broker, {
       username: config.mqtt.username,
-      password: config.mqtt.password
+      password: config.mqtt.password,
     });
 
     // Esperar a que se conecte MQTT
@@ -55,7 +55,7 @@ describe('Flujo de actualización extremo a extremo', function() {
 
     // Suscribirse al tema de actualizaciones
     mqttClient.subscribe('intercom/update/notification');
-    
+
     // Capturar mensajes
     mqttClient.on('message', (topic, message) => {
       if (topic === 'intercom/update/notification') {
@@ -73,7 +73,7 @@ describe('Flujo de actualización extremo a extremo', function() {
     try {
       const response = await axios.post(`${config.admin.url}/api/auth/login`, {
         username: config.admin.user,
-        password: config.admin.password
+        password: config.admin.password,
       });
 
       if (response.data && response.data.token) {
@@ -91,7 +91,7 @@ describe('Flujo de actualización extremo a extremo', function() {
   });
 
   // Después de todas las pruebas
-  after(function() {
+  after(function () {
     // Cerrar conexiones
     if (mqttClient) {
       mqttClient.end();
@@ -99,77 +99,71 @@ describe('Flujo de actualización extremo a extremo', function() {
   });
 
   // Pruebas del flujo de actualización
-  it('Debería enviar notificación de actualización desde Admin', async function() {
+  it('Debería enviar notificación de actualización desde Admin', async function () {
     const version = `test-${Date.now()}`;
-    
+
     // Limpiar mensajes anteriores
     mqttMessages = [];
-    
+
     // Enviar notificación de actualización
     const headers = { Authorization: authToken };
-    
+
     try {
       const response = await axios.post(
         `${config.admin.url}/api/notify-update`,
         { version, force: false },
         { headers }
       );
-      
+
       expect(response.status).to.equal(200);
       expect(response.data.success).to.be.true;
-      
+
       // Esperar a que llegue el mensaje MQTT (hasta 5 segundos)
-      await waitForMqttMessage(5000, (messages) => 
-        messages.some(msg => msg.version === version)
-      );
-      
+      await waitForMqttMessage(5000, (messages) => messages.some((msg) => msg.version === version));
+
       // Verificar que se recibió el mensaje con la versión correcta
-      const message = mqttMessages.find(msg => msg.version === version);
+      const message = mqttMessages.find((msg) => msg.version === version);
       expect(message).to.exist;
       expect(message.forceUpdate).to.be.false;
-      
     } catch (error) {
       console.error('Error al probar notificación:', error.message);
       throw error;
     }
   });
-  
-  it('Debería enviar notificación forzada correctamente', async function() {
+
+  it('Debería enviar notificación forzada correctamente', async function () {
     const version = `force-test-${Date.now()}`;
-    
+
     // Limpiar mensajes anteriores
     mqttMessages = [];
-    
+
     // Enviar notificación de actualización forzada
     const headers = { Authorization: authToken };
-    
+
     try {
       const response = await axios.post(
         `${config.admin.url}/api/notify-update`,
         { version, force: true },
         { headers }
       );
-      
+
       expect(response.status).to.equal(200);
       expect(response.data.success).to.be.true;
-      
+
       // Esperar a que llegue el mensaje MQTT (hasta 5 segundos)
-      await waitForMqttMessage(5000, (messages) => 
-        messages.some(msg => msg.version === version)
-      );
-      
+      await waitForMqttMessage(5000, (messages) => messages.some((msg) => msg.version === version));
+
       // Verificar que se recibió el mensaje con force=true
-      const message = mqttMessages.find(msg => msg.version === version);
+      const message = mqttMessages.find((msg) => msg.version === version);
       expect(message).to.exist;
       expect(message.forceUpdate).to.be.true;
-      
     } catch (error) {
       console.error('Error al probar notificación forzada:', error.message);
       throw error;
     }
   });
-  
-  it('Debería verificar la salud del servicio PWA', async function() {
+
+  it('Debería verificar la salud del servicio PWA', async function () {
     try {
       const response = await axios.get(`${config.pwa.url}/health`);
       expect(response.status).to.equal(200);
@@ -184,15 +178,15 @@ describe('Flujo de actualización extremo a extremo', function() {
 // Función de utilidad para esperar a que llegue un mensaje MQTT
 async function waitForMqttMessage(timeout, condition) {
   const startTime = Date.now();
-  
+
   while (Date.now() - startTime < timeout) {
     if (condition(mqttMessages)) {
       return true;
     }
-    
+
     // Esperar 100ms antes de verificar de nuevo
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  
+
   throw new Error('Timeout esperando mensaje MQTT');
 }

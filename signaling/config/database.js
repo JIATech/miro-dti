@@ -1,6 +1,6 @@
 /**
  * Configuración de conexión a MongoDB
- * 
+ *
  * Este módulo gestiona la conexión a la base de datos MongoDB
  * utilizada para almacenar información de usuarios y configuración.
  */
@@ -16,7 +16,7 @@ const MONGO_DB_NAME = process.env.MONGO_DB_NAME || 'intercom';
 const options = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  dbName: MONGO_DB_NAME
+  dbName: MONGO_DB_NAME,
 };
 
 // Función para conectar a MongoDB
@@ -52,5 +52,5 @@ process.on('SIGINT', async () => {
 });
 
 module.exports = {
-  connectDB
+  connectDB,
 };
