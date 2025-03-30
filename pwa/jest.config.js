@@ -1,30 +1,45 @@
 /**
- * Configuración de Jest para Intercom DTI - PWA
+ * Configuración de Jest para Intercom DTI PWA
  */
 
 module.exports = {
-  // Directorio donde Jest buscará los archivos de test
-  testMatch: ['**/tests/**/*.test.js'],
-
-  // Ignorar directorios de node_modules
+  // Directorio raíz donde Jest buscará los archivos
+  rootDir: './',
+  
+  // Archivos de test a ejecutar
+  testMatch: ['**/*.test.js'],
+  
+  // Directorios a ignorar
   testPathIgnorePatterns: ['/node_modules/'],
-
-  // Colectar información de cobertura
-  collectCoverage: true,
-
-  // Directorio donde se guardarán los informes de cobertura
-  coverageDirectory: 'coverage',
-
-  // Archivos para los que se medirá la cobertura
-  collectCoverageFrom: ['public/js/**/*.js', '!**/node_modules/**'],
-
-  // Configurar el entorno de pruebas para simular navegador
+  
+  // Directorios de cobertura
+  collectCoverageFrom: [
+    '**/*.js',
+    '!**/node_modules/**',
+    '!**/dist/**',
+    '!**/coverage/**',
+    '!jest.config.js',
+  ],
+  
+  // Configuración de ambiente
   testEnvironment: 'jsdom',
-
-  // Configuración para mocks
-  moduleNameMapper: {
-    '\\.(css|less)$': '<rootDir>/tests/mocks/styleMock.js',
-    '\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$':
-      '<rootDir>/tests/mocks/fileMock.js',
+  
+  // Archivos a ejecutar antes de los tests
+  setupFiles: ['./jest.setup.js'],
+  
+  // Módulos para transformar archivos
+  transform: {
+    '^.+\\.js$': 'babel-jest',
   },
+  
+  // Módulos a ignorar en transformación
+  transformIgnorePatterns: ['/node_modules/'],
+  
+  // Variables globales para todos los tests
+  globals: {
+    // Mocks para dependencias globales
+  },
+  
+  // Nivel de verbosidad
+  verbose: true,
 };
