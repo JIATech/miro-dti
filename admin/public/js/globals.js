@@ -3,598 +3,501 @@
  * Definiciones globales
  */
 
-// Variables y funciones que se utilizan en varios archivos
-window.updateLogDisplay = function (logs, container, showTimestamps = true) {
-  const logContainer = document.getElementById(container);
-  if (!logContainer) return;
+// Helper function for status badges
+function getStatusBadgeClass(status) {
+  switch (status ? status.toLowerCase() : 'unknown') {
+    case 'online':
+    case 'connected':
+    case 'active':
+    case 'running':
+      return 'bg-success';
+    case 'offline':
+    case 'disconnected':
+    case 'inactive':
+    case 'stopped':
+      return 'bg-danger';
+    case 'connecting':
+    case 'reconnecting':
+    case 'pending':
+      return 'bg-warning';
+    case 'error':
+      return 'bg-danger';
+    case 'idle':
+      return 'bg-secondary';
+    case 'ringing':
+    case 'busy':
+      return 'bg-info';
+    default:
+      return 'bg-secondary';
+  }
+}
 
-  logContainer.innerHTML = '';
+// Function to show toast notifications
+function showToast(title, message, type = 'info') {
+  // Assuming Bootstrap 5 Toast component is available
+  const toastContainer = document.getElementById('toast-container');
+  if (!toastContainer || typeof bootstrap === 'undefined') {
+    console.error('Toast container or Bootstrap not found. Cannot show toast:', title, message);
+    // Fallback to alert if Bootstrap or container is missing
+    alert(`${title}: ${message}`);
+    return;
+  }
 
+  const toastId = `toast-${Date.now()}`;
+  const toastHTML = `
+    <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body">
+          <strong>${title}</strong><br>
+          ${message}
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    </div>
+  `;
+
+  toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+  const toastElement = document.getElementById(toastId);
+  const toast = new bootstrap.Toast(toastElement, { delay: 5000 }); // Auto-hide after 5 seconds
+  toast.show();
+
+  // Remove the toast element from DOM after it's hidden
+  toastElement.addEventListener('hidden.bs.toast', () => {
+    toastElement.remove();
+  });
+}
+
+// Function to add a log entry (client-side placeholder if needed)
+function addLog(level, component, message) {
+  // This function might primarily be used server-side.
+  // Client-side, it could potentially send log data to the server via socket.
+  console.log(`[${level.toUpperCase()}] [${component}] ${message}`);
+  // Example: if (window.socket) { window.socket.emit('log', { level, component, message }); }
+}
+
+// Function to update the log display area
+function updateLogDisplay(logs, containerId, showTimestamps = true) {
+  const logContainer = document.getElementById(containerId);
+  if (!logContainer) {
+    console.error(`Log container #${containerId} not found.`);
+    return;
+  }
+
+  // Clear existing logs efficiently
+  while (logContainer.firstChild) {
+    logContainer.removeChild(logContainer.firstChild);
+  }
+
+  if (!Array.isArray(logs)) {
+    console.error('updateLogDisplay received non-array data:', logs);
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
   logs.forEach((log) => {
+    if (!log || typeof log !== 'object') return; // Skip invalid log entries
+
     const logEntry = document.createElement('div');
     logEntry.className = `log-entry log-${log.level || 'info'}`;
 
     let logText = '';
-    if (showTimestamps) {
-      const timestamp = new Date(log.timestamp);
-      logText += `<span class="log-time">${timestamp.toLocaleTimeString()}</span> `;
+    if (showTimestamps && log.timestamp) {
+      try {
+        const timestamp = new Date(log.timestamp);
+        // Check if timestamp is valid before formatting
+        if (!isNaN(timestamp)) {
+           logText += `<span class="log-time">${timestamp.toLocaleTimeString()}</span> `;
+        } else {
+           logText += `<span class="log-time">[Invalid Date]</span> `;
+        }
+      } catch (e) {
+         logText += `<span class="log-time">[Date Error]</span> `;
+      }
     }
 
     logText += `<span class="log-component">[${log.component || 'system'}]</span> `;
-    logText += `<span class="log-message">${log.message}</span>`;
+    logText += `<span class="log-message">${log.message || '(empty message)'}</span>`;
 
     logEntry.innerHTML = logText;
-    logContainer.appendChild(logEntry);
+    fragment.appendChild(logEntry);
   });
 
-  // Auto-scroll
+  logContainer.appendChild(fragment);
+
+  // Auto-scroll if enabled (check if appState exists and has the expected structure)
   if (window.appState && window.appState.logs && window.appState.logs.autoScroll) {
     logContainer.scrollTop = logContainer.scrollHeight;
   }
-};
+}
 
-window.updateServiceStatus = function (service, status) {
+// Function to update service status indicators
+function updateServiceStatus(service, status) {
   const serviceElement = document.querySelector(`.service-item[data-service="${service}"]`);
   if (!serviceElement) return;
 
   const statusBadge = serviceElement.querySelector('.service-status-badge');
   if (statusBadge) {
     statusBadge.className = `service-status-badge badge ${getStatusBadgeClass(status)}`;
-    statusBadge.textContent = status;
+    statusBadge.textContent = status || 'Unknown'; // Provide default text
   }
 
-  // Actualizar estado en el objeto appState
-  if (window.appState && window.appState.services) {
-    window.appState.services.status[service] = status;
+  // Update status in the global state object if it exists
+  if (window.appState && window.appState.services && window.appState.services.status) {
+     // Ensure the service exists in the status object before updating
+     if (typeof window.appState.services.status[service] !== 'undefined') {
+       window.appState.services.status[service] = status;
+     }
   }
-};
+}
 
-window.updateTabletStatus = function (deviceId, status) {
-  const tabletElement = document.querySelector(`.tablet-item[data-device="${deviceId}"]`);
-  if (!tabletElement) return;
+// Function to update tablet status indicators
+function updateTabletStatus(deviceId, status) {
+  const tabletElement = document.querySelector(`.tablet-item[data-device-id="${deviceId}"]`); // Use data-device-id
+  if (!tabletElement) {
+    // console.warn(`Tablet element not found for deviceId: ${deviceId}`);
+    return;
+  }
 
   const statusBadge = tabletElement.querySelector('.tablet-status-badge');
   if (statusBadge) {
     statusBadge.className = `tablet-status-badge badge ${getStatusBadgeClass(status)}`;
-    statusBadge.textContent = status;
+    statusBadge.textContent = status || 'Unknown'; // Provide default text
   }
 
-  // Actualizar estado en el objeto appState
-  if (window.appState && window.appState.tablets) {
+  // Update status in the global state object if it exists
+  if (window.appState && window.appState.tablets && Array.isArray(window.appState.tablets.list)) {
     const tablet = window.appState.tablets.list.find((t) => t.deviceId === deviceId);
     if (tablet) {
       tablet.status = status;
     }
   }
-};
+}
 
-window.handleDeviceResponse = function (data) {
-  console.log('Respuesta del dispositivo:', data);
+// Function to handle responses from device actions
+function handleDeviceResponse(data) {
+  console.log('Handling device response:', data);
+
+  if (!data || typeof data !== 'object') {
+     showToast('Error', 'Invalid response received from device action.', 'danger');
+     return;
+  }
+
+  const deviceName = data.deviceName || data.deviceId || 'Unknown Device';
 
   if (data.success) {
     showToast(
-      'Acción Completada',
-      `La acción se ha completado con éxito en ${data.deviceName}`,
+      'Action Completed',
+      `Action succeeded on ${deviceName}. ${data.message || ''}`,
       'success'
     );
+    // Optionally trigger a state refresh here if needed
+    // Example: if (window.requestStateUpdate) { window.requestStateUpdate(); }
   } else {
     showToast(
-      'Error',
-      `Error al ejecutar la acción en ${data.deviceName}: ${data.message}`,
+      'Action Failed',
+      `Action failed on ${deviceName}: ${data.message || 'No details provided.'}`,
       'danger'
     );
   }
 
-  // Actualizar información si es necesario
-  if (data.type === 'status') {
+  // Update status if the response includes it
+  if (data.deviceId && data.status) {
     updateTabletStatus(data.deviceId, data.status);
   }
-};
+}
 
-// Función para aplicar tema (oscuro/claro)
-window.applyTheme = function (theme) {
+
+// Function to apply the selected theme (dark/light)
+function applyTheme(theme) {
+  if (theme !== 'dark' && theme !== 'light') {
+    console.warn(`Invalid theme specified: ${theme}. Defaulting to light.`);
+    theme = 'light'; // Default to light theme if invalid
+  }
+
   document.body.classList.remove('theme-dark', 'theme-light');
   document.body.classList.add(`theme-${theme}`);
-  localStorage.setItem('theme', theme);
 
-  // Actualizar switch en la interfaz si existe
+  try {
+    localStorage.setItem('theme', theme);
+  } catch (e) {
+    console.error('Failed to save theme preference to localStorage:', e);
+  }
+
+
+  // Update the theme switch UI element if it exists
   const themeSwitch = document.getElementById('theme-switch');
   if (themeSwitch) {
     themeSwitch.checked = theme === 'dark';
   }
-};
+}
 
-// Funciones para configuraciones
-window.saveGeneralSettings = function () {
-  const settings = {
-    adminServer: document.getElementById('admin-server-url').value,
-    mqttBroker: document.getElementById('mqtt-broker-url').value,
-    logsRetention: parseInt(document.getElementById('logs-retention').value, 10),
-    refreshInterval: parseInt(document.getElementById('refresh-interval').value, 10),
-  };
+// --- Configuration Saving Functions ---
+// These functions rely on specific DOM element IDs and a global 'socket' object.
 
-  // Guardar configuración mediante Socket.IO
-  if (window.socket) {
-    window.socket.emit('save-settings', { type: 'general', settings });
-    showToast(
-      'Configuración Guardada',
-      'La configuración general se ha guardado correctamente',
-      'success'
-    );
-  } else {
-    showToast('Error', 'No hay conexión con el servidor', 'danger');
+function saveGeneralSettings() {
+  // Check for socket connection first
+  if (!window.socket || !window.socket.connected) {
+     showToast('Error', 'Cannot save settings. No connection to the server.', 'danger');
+     return;
   }
-};
 
-window.saveTabletsSettings = function () {
-  const settings = {
-    autoRegister: document.getElementById('auto-register-tablets').checked,
-    heartbeatInterval: parseInt(document.getElementById('heartbeat-interval').value, 10),
-    offlineTimeout: parseInt(document.getElementById('offline-timeout').value, 10),
-  };
+  try {
+    const settings = {
+      adminServerUrl: document.getElementById('admin-server-url').value.trim(),
+      mqttBrokerUrl: document.getElementById('mqtt-broker-url').value.trim(),
+      logsRetentionDays: parseInt(document.getElementById('logs-retention').value, 10),
+      uiRefreshIntervalSeconds: parseInt(document.getElementById('refresh-interval').value, 10),
+    };
 
-  // Guardar configuración mediante Socket.IO
-  if (window.socket) {
-    window.socket.emit('save-settings', { type: 'tablets', settings });
-    showToast(
-      'Configuración Guardada',
-      'La configuración de tablets se ha guardado correctamente',
-      'success'
-    );
-  } else {
-    showToast('Error', 'No hay conexión con el servidor', 'danger');
+    // Basic validation
+    if (isNaN(settings.logsRetentionDays) || settings.logsRetentionDays <= 0) {
+       showToast('Validation Error', 'Log retention must be a positive number of days.', 'warning');
+       return;
+    }
+     if (isNaN(settings.uiRefreshIntervalSeconds) || settings.uiRefreshIntervalSeconds < 5) {
+       showToast('Validation Error', 'UI Refresh interval must be at least 5 seconds.', 'warning');
+       return;
+    }
+    // Add more validation as needed (e.g., URL format)
+
+    window.socket.emit('save-settings', { type: 'general', settings }, (response) => {
+       if (response && response.success) {
+           showToast('Settings Saved', 'General settings saved successfully.', 'success');
+       } else {
+           showToast('Error Saving Settings', response?.message || 'Failed to save general settings.', 'danger');
+       }
+    });
+
+  } catch (error) {
+     console.error('Error preparing general settings:', error);
+     showToast('Error', 'Could not read settings from the form.', 'danger');
   }
-};
+}
 
-window.changeAdminPassword = function (event) {
-  event.preventDefault();
+function saveTabletsSettings() {
+   // Check for socket connection first
+  if (!window.socket || !window.socket.connected) {
+     showToast('Error', 'Cannot save settings. No connection to the server.', 'danger');
+     return;
+  }
 
-  const currentPassword = document.getElementById('current-password').value;
-  const newPassword = document.getElementById('new-password').value;
-  const confirmPassword = document.getElementById('confirm-password').value;
+  try {
+    const settings = {
+      allowAutoRegister: document.getElementById('auto-register-tablets').checked,
+      heartbeatIntervalSeconds: parseInt(document.getElementById('heartbeat-interval').value, 10),
+      offlineTimeoutSeconds: parseInt(document.getElementById('offline-timeout').value, 10),
+    };
 
-  // Validación básica
+     // Basic validation
+    if (isNaN(settings.heartbeatIntervalSeconds) || settings.heartbeatIntervalSeconds <= 0) {
+       showToast('Validation Error', 'Heartbeat interval must be a positive number of seconds.', 'warning');
+       return;
+    }
+     if (isNaN(settings.offlineTimeoutSeconds) || settings.offlineTimeoutSeconds <= settings.heartbeatIntervalSeconds) {
+       showToast('Validation Error', 'Offline timeout must be greater than the heartbeat interval.', 'warning');
+       return;
+    }
+
+     window.socket.emit('save-settings', { type: 'tablets', settings }, (response) => {
+       if (response && response.success) {
+           showToast('Settings Saved', 'Tablet settings saved successfully.', 'success');
+       } else {
+           showToast('Error Saving Settings', response?.message || 'Failed to save tablet settings.', 'danger');
+       }
+    });
+
+  } catch (error) {
+     console.error('Error preparing tablet settings:', error);
+     showToast('Error', 'Could not read tablet settings from the form.', 'danger');
+  }
+}
+
+
+function changeAdminPassword(event) {
+  if (event) {
+     event.preventDefault(); // Prevent default form submission if called from an event
+  }
+
+  // Check for socket connection first
+  if (!window.socket || !window.socket.connected) {
+     showToast('Error', 'Cannot change password. No connection to the server.', 'danger');
+     return;
+  }
+
+  const currentPasswordInput = document.getElementById('current-password');
+  const newPasswordInput = document.getElementById('new-password');
+  const confirmPasswordInput = document.getElementById('confirm-password');
+
+  const currentPassword = currentPasswordInput.value;
+  const newPassword = newPasswordInput.value;
+  const confirmPassword = confirmPasswordInput.value;
+
+  // Basic client-side validation
   if (!currentPassword || !newPassword || !confirmPassword) {
-    showToast('Error', 'Todos los campos son obligatorios', 'danger');
+    showToast('Validation Error', 'All password fields are required.', 'warning');
     return;
+  }
+
+  if (newPassword.length < 8) { // Example: Enforce minimum length
+     showToast('Validation Error', 'New password must be at least 8 characters long.', 'warning');
+     return;
   }
 
   if (newPassword !== confirmPassword) {
-    showToast('Error', 'Las contraseñas no coinciden', 'danger');
+    showToast('Validation Error', 'New passwords do not match.', 'warning');
     return;
   }
 
-  // Cambiar contraseña mediante Socket.IO
-  if (window.socket) {
-    window.socket.emit('change-password', { currentPassword, newPassword });
-  } else {
-    showToast('Error', 'No hay conexión con el servidor', 'danger');
+   if (newPassword === currentPassword) {
+    showToast('Validation Error', 'New password cannot be the same as the current password.', 'warning');
+    return;
   }
-};
 
-window.clearLogsByTimePeriod = function (timePeriod) {
-  let cutoffTime;
-  const now = new Date();
+
+  // Send request to server via Socket.IO
+  window.socket.emit('change-password', { currentPassword, newPassword }, (response) => {
+      if (response && response.success) {
+          showToast('Password Changed', 'Admin password updated successfully.', 'success');
+          // Clear password fields after successful change
+          currentPasswordInput.value = '';
+          newPasswordInput.value = '';
+          confirmPasswordInput.value = '';
+      } else {
+          showToast('Error Changing Password', response?.message || 'Failed to change password. Check current password.', 'danger');
+      }
+  });
+}
+
+
+function clearLogsByTimePeriod(timePeriod) {
+   // Check for socket connection first
+  if (!window.socket || !window.socket.connected) {
+     showToast('Error', 'Cannot clear logs. No connection to the server.', 'danger');
+     return;
+  }
+
+  let cutoffTimeISO;
+  const now = Date.now(); // Use timestamp for calculations
 
   switch (timePeriod) {
     case '1h':
-      cutoffTime = new Date(now.getTime() - 3600000); // 1 hora
+      cutoffTimeISO = new Date(now - 3600 * 1000).toISOString();
       break;
     case '6h':
-      cutoffTime = new Date(now.getTime() - 21600000); // 6 horas
+      cutoffTimeISO = new Date(now - 6 * 3600 * 1000).toISOString();
       break;
     case '24h':
-      cutoffTime = new Date(now.getTime() - 86400000); // 24 horas
+      cutoffTimeISO = new Date(now - 24 * 3600 * 1000).toISOString();
       break;
     case '7d':
-      cutoffTime = new Date(now.getTime() - 604800000); // 7 días
+      cutoffTimeISO = new Date(now - 7 * 24 * 3600 * 1000).toISOString();
       break;
     case '30d':
-      cutoffTime = new Date(now.getTime() - 2592000000); // 30 días
+      cutoffTimeISO = new Date(now - 30 * 24 * 3600 * 1000).toISOString();
       break;
+    case 'all':
+       // No cutoff time needed, server should handle 'all' specifically
+       cutoffTimeISO = null; // Or a specific value server understands for 'all'
+       break;
     default:
-      return; // No hacer nada si no es un período válido
+      showToast('Error', 'Invalid time period selected for clearing logs.', 'warning');
+      return;
   }
 
-  // Solicitar limpieza de logs al servidor
-  if (window.socket) {
-    window.socket.emit('clear-logs', { before: cutoffTime.toISOString() });
-    showToast(
-      'Limpieza de Logs',
-      `Se han eliminado los logs anteriores a ${cutoffTime.toLocaleString()}`,
-      'info'
-    );
+  const payload = { timePeriod }; // Send the period identifier
+  if (cutoffTimeISO) {
+     payload.before = cutoffTimeISO; // Optionally send calculated time if server needs it
   }
-};
 
-// Utilidades para status badges
-function getStatusBadgeClass(status) {
-  switch (status.toLowerCase()) {
-    case 'online':
-    case 'running':
-    case 'active':
-      return 'bg-success';
-    case 'offline':
-    case 'stopped':
-    case 'inactive':
-      return 'bg-danger';
-    case 'warning':
-    case 'restarting':
-      return 'bg-warning';
-    case 'pending':
-    case 'unknown':
-    default:
-      return 'bg-secondary';
-  }
+  console.log(`Requesting log clear for period: ${timePeriod}`);
+  window.socket.emit('clear-logs', payload, (response) => {
+      if (response && response.success) {
+          showToast('Logs Cleared', `Logs older than ${timePeriod} (or all) cleared successfully. Count: ${response.count || 0}`, 'success');
+          // Optionally trigger a refresh of the log view
+          // Example: if (window.requestLogUpdate) { window.requestLogUpdate(); }
+      } else {
+          showToast('Error Clearing Logs', response?.message || 'Failed to clear logs.', 'danger');
+      }
+  });
 }
 
-// Variables para el log
-window.addLog = function (type, message, data = {}) {
-  if (window.socket) {
-    window.socket.emit('log', { type, message, data });
-  }
 
-  // También mostrar en consola para debug
-  console.log(`[${type}] ${message}`, data);
+// --- Initialization and Global Exposure ---
+
+// Store functions in an object for easier management
+const globalFunctions = {
+  getStatusBadgeClass,
+  showToast,
+  addLog,
+  updateLogDisplay,
+  updateServiceStatus,
+  updateTabletStatus,
+  handleDeviceResponse,
+  applyTheme,
+  saveGeneralSettings,
+  saveTabletsSettings,
+  changeAdminPassword,
+  clearLogsByTimePeriod,
 };
 
-// Mostrar notificación tipo toast
-window.showToast = function (title, message, type = 'info') {
-  const toastEl = document.getElementById('notification-toast');
-  const toastTitle = document.getElementById('notification-title');
-  const toastBody = document.getElementById('notification-body');
-
-  if (!toastEl || !toastTitle || !toastBody) {
-    console.error('Elementos toast no encontrados');
-    return;
-  }
-
-  // Actualizar contenido
-  toastTitle.textContent = title;
-  toastBody.textContent = message;
-
-  // Actualizar tipo/estilo
-  toastEl.className = toastEl.className.replace(/bg-\w+/, '');
-  toastEl.classList.add(`bg-${type}`);
-
-  // Mostrar notificación
-  const toast = new bootstrap.Toast(toastEl);
-  toast.show();
-};
-
-// Actualizar visualización de logs
-window.updateLogDisplay = function (logs, containerId, showTimestamps = true) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-
-  // Vaciar contenedor
-  container.innerHTML = '';
-
-  // Verificar si hay logs
-  if (!logs || logs.length === 0) {
-    container.innerHTML =
-      '<div class="text-center py-3 text-muted"><em>No hay logs disponibles</em></div>';
-    return;
-  }
-
-  // Crear elemento para cada log
-  logs.forEach((log) => {
-    // Determinar clase según nivel
-    const levelClass =
-      log.level === 'error'
-        ? 'text-danger'
-        : log.level === 'warning'
-          ? 'text-warning'
-          : log.level === 'success'
-            ? 'text-success'
-            : 'text-info';
-
-    // Crear elemento de log
-    const logEl = document.createElement('div');
-    logEl.className = `log-item ${levelClass} py-1`;
-
-    // Formatear tiempo si es necesario
-    let timeString = '';
-    if (showTimestamps && log.timestamp) {
-      const date = new Date(log.timestamp);
-      timeString = `<span class="log-time text-muted me-2">[${date.toLocaleTimeString()}]</span>`;
-    }
-
-    // Establecer contenido
-    logEl.innerHTML = `
-      ${timeString}
-      <span class="log-message">${log.message || ''}</span>
-    `;
-
-    // Agregar al contenedor
-    container.appendChild(logEl);
+// Conditionally expose functions to the window object if in a browser environment
+if (typeof window !== 'undefined') {
+  Object.keys(globalFunctions).forEach(key => {
+    window[key] = globalFunctions[key];
   });
 
-  // Auto-scroll si está habilitado
-  if (window.appState && window.appState.logs && window.appState.logs.autoScroll) {
-    container.scrollTop = container.scrollHeight;
-  }
-};
+  // Initialize theme on load
+  document.addEventListener('DOMContentLoaded', () => {
+    const savedTheme = localStorage.getItem('theme') || 'light'; // Default to light
+    applyTheme(savedTheme);
 
-// Actualizar estado de servicio en la UI
-window.updateServiceStatus = function (serviceName, status) {
-  // Buscar elementos relacionados con este servicio
-  const statusBadges = document.querySelectorAll(
-    `.service-status-badge[data-service="${serviceName}"]`
-  );
-
-  // Determinar clase según estado
-  const statusClass =
-    status === 'running'
-      ? 'bg-success'
-      : status === 'stopped'
-        ? 'bg-danger'
-        : status === 'restarting'
-          ? 'bg-warning'
-          : 'bg-secondary';
-
-  // Actualizar cada badge
-  statusBadges.forEach((badge) => {
-    // Eliminar clases actuales
-    badge.className = badge.className.replace(/bg-\w+/, '');
-    badge.classList.add('service-status-badge', 'badge', statusClass);
-    badge.textContent = status;
-  });
-
-  // Actualizar botones de acción
-  const actionBtns = document.querySelectorAll(`button[data-service="${serviceName}"]`);
-  actionBtns.forEach((btn) => {
-    // Ocultar todos los botones primero
-    btn.style.display = 'none';
-
-    // Mostrar botones según el estado
-    if (status === 'running') {
-      if (btn.dataset.action === 'restart' || btn.dataset.action === 'stop') {
-        btn.style.display = 'inline-block';
-      }
-    } else {
-      if (btn.dataset.action === 'start') {
-        btn.style.display = 'inline-block';
-      }
-    }
-  });
-};
-
-// Actualizar estado de tablet en la UI
-window.updateTabletStatus = function (deviceId, status) {
-  // Buscar elementos relacionados con esta tablet
-  const tabletItems = document.querySelectorAll(`.tablet-item[data-device="${deviceId}"]`);
-
-  // Determinar clase según estado
-  const statusClass =
-    status === 'online' ? 'bg-success' : status === 'offline' ? 'bg-danger' : 'bg-secondary';
-
-  // Actualizar cada elemento
-  tabletItems.forEach((item) => {
-    // Actualizar badge de estado
-    const badge = item.querySelector('.tablet-status-badge');
-    if (badge) {
-      badge.className = badge.className.replace(/bg-\w+/, '');
-      badge.classList.add('tablet-status-badge', 'badge', statusClass);
-      badge.textContent = status;
+    // Add event listener for the theme switch if it exists
+    const themeSwitch = document.getElementById('theme-switch');
+    if (themeSwitch) {
+      themeSwitch.addEventListener('change', (event) => {
+        applyTheme(event.target.checked ? 'dark' : 'light');
+      });
     }
 
-    // También podríamos actualizar otros indicadores visuales si los hay
+     // Add event listeners for save buttons etc. if they exist
+     // Example for General Settings Save Button
+     const saveGeneralBtn = document.getElementById('save-general-settings-btn');
+     if (saveGeneralBtn) {
+         saveGeneralBtn.addEventListener('click', saveGeneralSettings);
+     }
+
+      // Example for Tablets Settings Save Button
+     const saveTabletsBtn = document.getElementById('save-tablets-settings-btn');
+     if (saveTabletsBtn) {
+         saveTabletsBtn.addEventListener('click', saveTabletsSettings);
+     }
+
+      // Example for Change Password Form
+     const changePasswordForm = document.getElementById('change-password-form');
+     if (changePasswordForm) {
+         changePasswordForm.addEventListener('submit', changeAdminPassword);
+     }
+
+      // Example for Log Clearing Buttons (using event delegation might be better)
+     const logClearControls = document.getElementById('log-clear-controls'); // Assuming a container
+     if (logClearControls) {
+         logClearControls.addEventListener('click', (event) => {
+            if (event.target.matches('button[data-clear-period]')) {
+                const period = event.target.getAttribute('data-clear-period');
+                if (period) {
+                    clearLogsByTimePeriod(period);
+                }
+            }
+         });
+     }
+
   });
-};
+}
 
-// Manejar respuesta de dispositivo
-window.handleDeviceResponse = function (response) {
-  if (!response) return;
-
-  // Verificar si hay un error
-  if (response.error) {
-    window.showToast('Error', response.error, 'danger');
-    return;
-  }
-
-  // Mostrar mensaje de éxito si hay uno
-  if (response.message) {
-    window.showToast('Éxito', response.message, 'success');
-  }
-
-  // Manejar diferentes tipos de comandos
-  if (response.command) {
-    switch (response.command) {
-      case 'speak':
-        console.log('TTS enviado correctamente');
-        break;
-      case 'restart':
-        console.log('Comando de reinicio enviado');
-        break;
-      case 'ping':
-        // Actualizar UI con información del ping
-        window.showToast('Ping', `Respuesta recibida: ${response.latency}ms`, 'info');
-        break;
-      // Otros comandos posibles
-      default:
-        console.log(`Respuesta para comando ${response.command}:`, response);
-    }
-  }
-};
-
-// Aplicar tema
-window.applyTheme = function (theme) {
-  // Verificar tema válido
-  if (theme !== 'light' && theme !== 'dark') {
-    console.error('Tema no válido:', theme);
-    return;
-  }
-
-  // Aplicar tema al elemento HTML
-  document.documentElement.setAttribute('data-bs-theme', theme);
-
-  // Guardar preferencia
-  localStorage.setItem('theme', theme);
-
-  // Actualizar botón de tema
-  const themeIcon = document.getElementById('theme-icon');
-  if (themeIcon) {
-    themeIcon.className = theme === 'dark' ? 'bi bi-moon-fill' : 'bi bi-sun-fill';
-  }
-
-  console.log(`Tema aplicado: ${theme}`);
-};
-
-// Guardar configuración general
-window.saveGeneralSettings = function (event) {
-  // Prevenir envío del formulario
-  if (event) event.preventDefault();
-
-  // Obtener valores del formulario
-  const form = document.getElementById('general-settings-form');
-  if (!form) return;
-
-  const formData = new FormData(form);
-  const settings = {
-    adminPort: formData.get('admin-port'),
-    mqttBroker: formData.get('mqtt-broker'),
-    mongoUri: formData.get('mongo-uri'),
-    logsLevel: formData.get('logs-level'),
-  };
-
-  // Enviar configuración al servidor
-  if (window.socket) {
-    window.socket.emit('update_settings', { general: settings });
-    window.showToast('Configuración', 'Guardando configuración...', 'info');
-  } else {
-    window.showToast('Error', 'No hay conexión con el servidor', 'danger');
-  }
-};
-
-// Guardar configuración de tablets
-window.saveTabletsSettings = function (event) {
-  // Prevenir envío del formulario
-  if (event) event.preventDefault();
-
-  // Obtener valores del formulario
-  const form = document.getElementById('tablets-settings-form');
-  if (!form) return;
-
-  const formData = new FormData(form);
-  const settings = {
-    checkInterval: formData.get('check-interval'),
-    offlineTimeout: formData.get('offline-timeout'),
-    autoRestart: formData.get('auto-restart') === 'on',
-  };
-
-  // Enviar configuración al servidor
-  if (window.socket) {
-    window.socket.emit('update_settings', { tablets: settings });
-    window.showToast('Configuración', 'Guardando configuración de tablets...', 'info');
-  } else {
-    window.showToast('Error', 'No hay conexión con el servidor', 'danger');
-  }
-};
-
-// Cambiar contraseña de administrador
-window.changeAdminPassword = function (event) {
-  // Prevenir envío del formulario
-  if (event) event.preventDefault();
-
-  // Obtener valores del formulario
-  const form = document.getElementById('security-settings-form');
-  if (!form) return;
-
-  const formData = new FormData(form);
-  const currentPassword = formData.get('current-password');
-  const newPassword = formData.get('new-password');
-  const confirmPassword = formData.get('confirm-password');
-
-  // Validar entradas
-  if (!currentPassword || !newPassword || !confirmPassword) {
-    window.showToast('Error', 'Todos los campos son obligatorios', 'danger');
-    return;
-  }
-
-  if (newPassword !== confirmPassword) {
-    window.showToast('Error', 'Las contraseñas no coinciden', 'danger');
-    return;
-  }
-
-  // Enviar al servidor
-  if (window.socket) {
-    window.socket.emit('change_password', {
-      current: currentPassword,
-      new: newPassword,
-    });
-    window.showToast('Seguridad', 'Cambiando contraseña...', 'info');
-  } else {
-    window.showToast('Error', 'No hay conexión con el servidor', 'danger');
-  }
-};
-
-// Limpiar logs por período de tiempo
-window.clearLogsByTimePeriod = function (period) {
-  // Verificar período válido
-  const validPeriods = ['today', 'week', 'month', 'all'];
-  if (!validPeriods.includes(period)) {
-    console.error('Período no válido:', period);
-    return;
-  }
-
-  // Solicitar limpieza al servidor
-  if (window.socket) {
-    window.socket.emit('clear_logs', { period });
-    window.showToast('Logs', `Limpiando logs (${period})...`, 'info');
-  } else {
-    window.showToast('Error', 'No hay conexión con el servidor', 'danger');
-  }
-
-  // También limpiar logs locales si period es 'all'
-  if (period === 'all' && window.appState && window.appState.logs) {
-    Object.keys(window.appState.logs.data).forEach((category) => {
-      window.appState.logs.data[category] = [];
-    });
-
-    // Actualizar vistas
-    document.querySelectorAll('.logs-container').forEach((container) => {
-      container.innerHTML =
-        '<div class="text-center py-3 text-muted"><em>No hay logs disponibles</em></div>';
-    });
-  }
-};
-
-// Agregar un log
-window.addLog = function (type, message, data = {}) {
-  // Crear entrada de log
-  const logEntry = {
-    timestamp: new Date(),
-    type,
-    message,
-    data,
-    service: 'admin',
-  };
-
-  // Emitir a través de socket si está disponible
-  if (window.socket) {
-    window.socket.emit('log', logEntry);
-  }
-
-  // También mostrar en consola
-  const logMethod = type === 'error' ? console.error : console.log;
-  logMethod(`[${type}] ${message}`, data);
-
-  return logEntry;
-};
-
-// Exportar funciones globales para testing
+// Export functions for potential use in Node.js environments (e.g., testing)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    updateLogDisplay,
-    updateServiceStatus,
-    updateTabletStatus,
-    handleDeviceResponse,
-    applyTheme,
-    saveGeneralSettings,
-    saveTabletsSettings,
-    changeAdminPassword,
-    clearLogsByTimePeriod,
-    addLog,
-  };
+  module.exports = globalFunctions;
 }
+
+// Example of using a function (can be removed, just for demo)
+// showToast('Globals Loaded', 'Global functions are ready.', 'info');
