@@ -177,11 +177,11 @@ jobs:
       - name: Build and push MiroTalkSFU Lite image
         uses: docker/build-push-action@v5
         with:
-          context: ./mirotalksfu-lite
+          context: ./sfu_lite
           push: true
           tags: |
-            ghcr.io/jiatech/intercom-mirotalksfu-lite:latest
-            ghcr.io/jiatech/intercom-mirotalksfu-lite:${{ steps.version.outputs.version }}
+            ghcr.io/jiatech/intercom-sfu_lite:latest
+            ghcr.io/jiatech/intercom-sfu_lite:${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

@@ -22,11 +22,11 @@ services:
       - intercom-network
     depends_on:
       - signaling
-      - mirotalksfu-lite
+      - sfu_lite
     environment:
       - NODE_ENV=production
       # Valores iniciales para PWA - Se pueden cambiar desde la interfaz
-      - LOCAL_SFU_URL=http://mirotalksfu-lite:3000
+      - LOCAL_SFU_URL=http://sfu_lite:3000
       - FALLBACK_SFU_URL=${FALLBACK_SFU_IP:-https://fallback-server.example.com:8080}
       - SIGNALING_URL=http://signaling:3000
     healthcheck:
@@ -78,12 +78,12 @@ services:
     #       cpus: '1'
     #       memory: 512M
 
-  mirotalksfu-lite:
+  sfu_lite:
     build: 
-      context: ./mirotalksfu-lite
+      context: ./sfu_lite
       dockerfile: Dockerfile
-    image: dtiteam/intercom-mirotalksfu-lite:latest
-    container_name: intercom-mirotalksfu-lite
+    image: dtiteam/intercom-sfu_lite:latest
+    container_name: intercom-sfu_lite
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -118,8 +118,7 @@ services:
     networks:
       - intercom-network
     volumes:
-      # Persistencia para grabaciones (si se habilitan)
-      - ./mirotalksfu-lite/app/rec:/app/app/rec
+      - ./sfu_lite/app/rec:/app/app/rec
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 30s
@@ -157,7 +156,7 @@ services:
       - mongodb
       - pwa
       - signaling
-      - mirotalksfu-lite
+      - sfu_lite
     volumes:
       - ./admin/logs:/app/logs
     healthcheck:

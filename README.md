@@ -7,7 +7,7 @@ Aplicación estilo portero intercom basada en WebRTC utilizando MiroTalkSFU Lite
 ```
 /miro-dti/
 ├── admin/             # Panel de administración y monitoreo
-├── mirotalksfu-lite/   # Servidor SFU Lite para WebRTC
+├── sfu_lite/   # Servidor SFU Lite para WebRTC
 ├── pwa/               # Aplicación Web Progresiva (interfaz de usuario)
 ├── signaling/         # Servidor de señalización WebSocket
 ├── docker-compose.yml # Configuración principal de servicios
@@ -31,7 +31,7 @@ El sistema está containerizado utilizando Docker y orquestado con Docker Compos
 |-------------|--------------------------------|----------------|--------|----------------------------------------|
 | PWA         | dtiteam/intercom-pwa:latest    | nginx:alpine   | 80     | Aplicación web para tablets            |
 | Signaling   | dtiteam/intercom-signaling:latest | node:20-alpine | 3000   | Servidor de señalización WebSocket     |
-| MiroTalkSFU Lite | dtiteam/intercom-mirotalksfu-lite:latest | node:22-slim | 8080   | Servidor WebRTC para llamadas          |
+| MiroTalkSFU Lite | dtiteam/intercom-sfu_lite:latest | node:22-slim | 8080   | Servidor WebRTC para llamadas          |
 | Admin       | dtiteam/intercom-admin:latest  | node:20-alpine | 8090   | Panel de monitorización                |
 | MongoDB     | mongo:5.0                      | -              | 27017  | Base de datos para autenticación y logs|
 
@@ -125,7 +125,7 @@ Los siguientes volúmenes preservan datos entre reinicios:
 
 - `/mongodb_data`: Base de datos MongoDB
 - `./signaling/logs`: Logs del servidor de señalización
-- `./mirotalksfu-lite/app/rec`: Grabaciones (si se habilitan)
+- `./sfu_lite/app/rec`: Grabaciones (si se habilitan)
 - `./admin/logs`: Logs del panel de administración
 
 ## Monitorización y Administración
@@ -183,7 +183,7 @@ Este sistema implementa:
 
 ### MiroTalkSFU Lite
 
-MiroTalkSFU Lite es un fork optimizado de MiroTalkSFU, adaptado específicamente para las necesidades del sistema Intercom DTI. A diferencia de versiones anteriores del proyecto, ahora este componente está **integrado directamente** en el repositorio (no es un submódulo) en la carpeta `/mirotalksfu-lite`.
+MiroTalkSFU Lite es un fork optimizado de MiroTalkSFU, adaptado específicamente para las necesidades del sistema Intercom DTI. A diferencia de versiones anteriores del proyecto, ahora este componente está **integrado directamente** en el repositorio (no es un submódulo) en la carpeta `/sfu_lite`.
 
 Las principales optimizaciones realizadas incluyen:
 
@@ -206,7 +206,7 @@ cd miro-dti
 
 Si deseas contribuir mejoras específicas a MiroTalkSFU Lite:
 
-1. Realiza los cambios en la carpeta `/mirotalksfu-lite`
+1. Realiza los cambios en la carpeta `/sfu_lite`
 2. Asegúrate de probar localmente con `docker-compose up`
 3. Envía un Pull Request con tus modificaciones
 
@@ -214,8 +214,8 @@ Si deseas contribuir mejoras específicas a MiroTalkSFU Lite:
 
 Si necesitas adaptar aún más la configuración de MiroTalkSFU Lite, puedes modificar los siguientes archivos:
 
-- `/mirotalksfu-lite/app/src/config.js`: Configuración principal del servicio
-- `/mirotalksfu-lite/docker-compose.template.yml`: Plantilla para despliegue independiente
+- `/sfu_lite/app/src/config.js`: Configuración principal del servicio
+- `/sfu_lite/docker-compose.template.yml`: Plantilla para despliegue independiente
 
 ### WallPanel
 
