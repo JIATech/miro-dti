@@ -1,8 +1,12 @@
-html { box-sizing: border-box; }
+html {
+  box-sizing: border-box;
+}
 
 *,
 *::before,
-*::after { box-sizing: inherit; }
+*::after {
+  box-sizing: inherit;
+}
 
 body * {
   margin: 0;
@@ -10,7 +14,9 @@ body * {
 }
 
 body {
-  font: normal 100%/1.15 "Merriweather", serif;
+  font:
+    normal 100%/1.15 'Merriweather',
+    serif;
   background-color: #ffffff;
   color: #fff;
 }
@@ -32,7 +38,9 @@ body {
   text-align: center;
 }
 
-h1, p:not(:last-of-type) { }
+h1,
+p:not(:last-of-type) {
+}
 
 h1 {
   margin: 0 0 1rem 0;
@@ -41,14 +49,16 @@ h1 {
 }
 
 p {
-margin-top: 0.5em;
+  margin-top: 0.5em;
   margin-bottom: 0.5em;
   font-size: 1.5em;
   text-align: center;
   color: #216f79;
 }
 
-p:first-of-type { margin-top: 0em; }
+p:first-of-type {
+  margin-top: 0em;
+}
 
 p > a {
   border-bottom: 1px dashed #216f79;
@@ -57,6 +67,10 @@ p > a {
   color: #216f79;
 }
 
-p > a:hover { text-shadow: 0 0 6px #216f79; }
+p > a:hover {
+  text-shadow: 0 0 6px #216f79;
+}
 
-p img { vertical-align: bottom; }
+p img {
+  vertical-align: bottom;
+}

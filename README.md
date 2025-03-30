@@ -27,19 +27,20 @@ El sistema está containerizado utilizando Docker y orquestado con Docker Compos
 
 ### Imágenes Docker
 
-| Servicio    | Imagen                          | Base           | Puerto | Descripción                            |
-|-------------|--------------------------------|----------------|--------|----------------------------------------|
-| PWA         | dtiteam/intercom-pwa:latest    | nginx:alpine   | 80     | Aplicación web para tablets            |
-| Signaling   | dtiteam/intercom-signaling:latest | node:20-alpine | 3000   | Servidor de señalización WebSocket     |
-| MiroTalkSFU Lite | dtiteam/intercom-sfu_lite:latest | node:22-slim | 8080   | Servidor WebRTC para llamadas          |
-| Admin       | dtiteam/intercom-admin:latest  | node:20-alpine | 8090   | Panel de monitorización                |
-| MongoDB     | mongo:5.0                      | -              | 27017  | Base de datos para autenticación y logs|
+| Servicio         | Imagen                            | Base           | Puerto | Descripción                             |
+| ---------------- | --------------------------------- | -------------- | ------ | --------------------------------------- |
+| PWA              | dtiteam/intercom-pwa:latest       | nginx:alpine   | 80     | Aplicación web para tablets             |
+| Signaling        | dtiteam/intercom-signaling:latest | node:20-alpine | 3000   | Servidor de señalización WebSocket      |
+| MiroTalkSFU Lite | dtiteam/intercom-sfu_lite:latest  | node:22-slim   | 8080   | Servidor WebRTC para llamadas           |
+| Admin            | dtiteam/intercom-admin:latest     | node:20-alpine | 8090   | Panel de monitorización                 |
+| MongoDB          | mongo:5.0                         | -              | 27017  | Base de datos para autenticación y logs |
 
 ### Seguridad y Usuarios con Privilegios Limitados
 
 Todas las imágenes implementan el principio de menor privilegio mediante usuarios no-root:
 
 #### PWA (Nginx)
+
 - **Usuario**: `nginx` (pre-existente en imagen base)
 - **Permisos**: Sólo acceso de lectura a archivos estáticos
 - **Seguridad adicional**:
@@ -47,6 +48,7 @@ Todas las imágenes implementan el principio de menor privilegio mediante usuari
   - Sin acceso a archivos .htaccess
 
 #### Signaling y Admin
+
 - **Usuario**: `appuser` (UID 1000)
 - **Permisos**: Acceso sólo a directorio /app y sus logs
 - **Seguridad adicional**:
@@ -54,6 +56,7 @@ Todas las imágenes implementan el principio de menor privilegio mediante usuari
   - Solo dependencias de producción instaladas
 
 #### MiroTalkSFU Lite
+
 - **Usuario**: `mirotalk` (UID 1000)
 - **Permisos**: Acceso a directorios específicos (/src, /src/app/rec, /src/app/logs)
 - **Consideraciones especiales**:
@@ -63,14 +66,17 @@ Todas las imágenes implementan el principio de menor privilegio mediante usuari
 ### Características de Seguridad
 
 1. **Multi-stage Builds**:
+
    - Reducen superficie de ataque al incluir solo componentes necesarios
    - Separan entorno de construcción y ejecución
 
 2. **Healthchecks**:
+
    - Cada servicio implementa verificaciones de salud
    - Monitorización automática de estado en tiempo real
 
 3. **Optimización de Imágenes**:
+
    - Reducción de tamaño eliminando cachés y archivos temporales
    - Uso de imágenes Alpine donde es posible para minimizar superficie
 
@@ -162,15 +168,18 @@ docker-compose push
 Este sistema implementa:
 
 1. **Seguridad por capas**:
+
    - Red Docker aislada
    - Usuarios no-root en cada contenedor
    - Permisos mínimos necesarios
 
 2. **Autenticación**:
+
    - Básica para panel de administración
    - Basada en roles para la PWA
 
 3. **Logs centralizados**:
+
    - Todos los componentes envían logs al panel admin
    - Asegura audit trail para problemas de seguridad
 

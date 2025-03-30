@@ -11,7 +11,7 @@
   overflow: hidden;
 }
 
-[data-theme=dark] .heroBanner {
+[data-theme='dark'] .heroBanner {
   color: var(--ifm-heading-color);
 }
 

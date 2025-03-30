@@ -8,31 +8,31 @@ WallPanel proporciona acceso a diversos datos del dispositivo que pueden ser mon
 
 ### Información de Hardware
 
-| Dato | Descripción | Método JavaScript | Ejemplo |
-|------|-------------|-------------------|---------|
-| Nivel de Batería | Porcentaje de carga actual | `getBatteryLevel()` | `78` (porcentaje) |
-| Estado de Carga | Si el dispositivo está cargando | `isCharging()` | `true/false` |
-| Dirección IP | IP del dispositivo en la red | `getIp()` | `"192.168.1.100"` |
-| Dirección MAC | Identificador de hardware de red | `getMacAddress()` | `"00:11:22:33:44:55"` |
-| Temperatura | Temperatura del dispositivo (si disponible) | *Vía MQTT* | `38.5` (grados C) |
+| Dato             | Descripción                                 | Método JavaScript   | Ejemplo               |
+| ---------------- | ------------------------------------------- | ------------------- | --------------------- |
+| Nivel de Batería | Porcentaje de carga actual                  | `getBatteryLevel()` | `78` (porcentaje)     |
+| Estado de Carga  | Si el dispositivo está cargando             | `isCharging()`      | `true/false`          |
+| Dirección IP     | IP del dispositivo en la red                | `getIp()`           | `"192.168.1.100"`     |
+| Dirección MAC    | Identificador de hardware de red            | `getMacAddress()`   | `"00:11:22:33:44:55"` |
+| Temperatura      | Temperatura del dispositivo (si disponible) | _Vía MQTT_          | `38.5` (grados C)     |
 
 ### Estado del Sistema
 
-| Dato | Descripción | Método JavaScript | Ejemplo |
-|------|-------------|-------------------|---------|
-| Versión de Android | Versión del SO | `getAndroidVersion()` | `"11"` |
-| Pantalla Activa | Si la pantalla está encendida | `isScreenOn()` | `true/false` |
-| Brillo de Pantalla | Nivel actual de brillo | `getScreenBrightness()` | `75` (porcentaje) |
-| Versión de WallPanel | Versión de la aplicación | `getAppVersion()` | `"0.12.0"` |
-| Estado de Memoria | Uso de memoria del dispositivo | *Vía MQTT* | `"75%"` |
+| Dato                 | Descripción                    | Método JavaScript       | Ejemplo           |
+| -------------------- | ------------------------------ | ----------------------- | ----------------- |
+| Versión de Android   | Versión del SO                 | `getAndroidVersion()`   | `"11"`            |
+| Pantalla Activa      | Si la pantalla está encendida  | `isScreenOn()`          | `true/false`      |
+| Brillo de Pantalla   | Nivel actual de brillo         | `getScreenBrightness()` | `75` (porcentaje) |
+| Versión de WallPanel | Versión de la aplicación       | `getAppVersion()`       | `"0.12.0"`        |
+| Estado de Memoria    | Uso de memoria del dispositivo | _Vía MQTT_              | `"75%"`           |
 
 ### Sensores (si están habilitados)
 
-| Dato | Descripción | Disponibilidad | Ejemplo |
-|------|-------------|----------------|---------|
-| Luz Ambiental | Nivel de luz en el entorno | MQTT | `250` (lux) |
-| Movimiento | Detección de movimiento | MQTT + Evento JS | `true/false` |
-| Presencia Facial | Detección de rostros | MQTT + Evento JS | `true/false` |
+| Dato             | Descripción                | Disponibilidad   | Ejemplo      |
+| ---------------- | -------------------------- | ---------------- | ------------ |
+| Luz Ambiental    | Nivel de luz en el entorno | MQTT             | `250` (lux)  |
+| Movimiento       | Detección de movimiento    | MQTT + Evento JS | `true/false` |
+| Presencia Facial | Detección de rostros       | MQTT + Evento JS | `true/false` |
 
 ## Métodos de Integración
 
@@ -43,33 +43,33 @@ Para obtener datos en tiempo real desde tu aplicación PWA:
 ```javascript
 // Función para obtener información básica del dispositivo
 function getDeviceStatus() {
-    if (typeof window.WallPanel !== 'undefined') {
-        return {
-            batteryLevel: window.WallPanel.getBatteryLevel(),
-            isCharging: window.WallPanel.isCharging(),
-            ipAddress: window.WallPanel.getIp(),
-            screenBrightness: window.WallPanel.getScreenBrightness(),
-            timestamp: new Date().toISOString()
-        };
-    }
-    return null;
+  if (typeof window.WallPanel !== 'undefined') {
+    return {
+      batteryLevel: window.WallPanel.getBatteryLevel(),
+      isCharging: window.WallPanel.isCharging(),
+      ipAddress: window.WallPanel.getIp(),
+      screenBrightness: window.WallPanel.getScreenBrightness(),
+      timestamp: new Date().toISOString(),
+    };
+  }
+  return null;
 }
 
 // Ejemplo de envío periódico al servidor de monitorización
 function reportDeviceStatus() {
-    const status = getDeviceStatus();
-    if (status) {
-        fetch('/api/device-status', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(status)
-        });
-    }
-    
-    // Reportar cada 5 minutos
-    setTimeout(reportDeviceStatus, 5 * 60 * 1000);
+  const status = getDeviceStatus();
+  if (status) {
+    fetch('/api/device-status', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(status),
+    });
+  }
+
+  // Reportar cada 5 minutos
+  setTimeout(reportDeviceStatus, 5 * 60 * 1000);
 }
 ```
 
@@ -104,22 +104,22 @@ intercom/[ID-DISPOSITIVO]/sensor/temperature  → {"value": 38.5}
 Para integrar estos datos en el sistema de monitorización del Intercom DTI:
 
 1. **Configurar cliente MQTT en el servidor de monitorización**:
-   
+
    ```javascript
    // En el servidor Node.js de monitorización
    const mqtt = require('mqtt');
    const client = mqtt.connect('mqtt://localhost:1883');
-   
+
    client.on('connect', () => {
      client.subscribe('intercom/+/sensor/#');
    });
-   
+
    client.on('message', (topic, message) => {
      // Formato: intercom/DEVICE-ID/sensor/TYPE
      const parts = topic.split('/');
      const deviceId = parts[1];
      const sensorType = parts[3];
-     
+
      try {
        const data = JSON.parse(message.toString());
        // Almacenar en base de datos o enviar a dashboard
@@ -131,8 +131,9 @@ Para integrar estos datos en el sistema de monitorización del Intercom DTI:
    ```
 
 2. **Añadir al dashboard de monitorización existente**:
-   
+
    Actualizar el panel de control para incluir nuevas métricas:
+
    - Estado de batería de dispositivos
    - Última vez visto online
    - Temperatura del dispositivo

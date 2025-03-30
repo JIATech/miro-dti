@@ -75,12 +75,10 @@ beforeAll(() => {
       const { version, force = false } = req.body;
 
       if (!version) {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: 'Se requiere versión para la notificación de actualización',
-          });
+        return res.status(400).json({
+          success: false,
+          message: 'Se requiere versión para la notificación de actualización',
+        });
       }
 
       // Actualizar archivo de versión
@@ -115,13 +113,11 @@ beforeAll(() => {
         force,
       });
     } catch (error) {
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message: 'Error al notificar actualización',
-          error: error.message,
-        });
+      return res.status(500).json({
+        success: false,
+        message: 'Error al notificar actualización',
+        error: error.message,
+      });
     }
   });
 

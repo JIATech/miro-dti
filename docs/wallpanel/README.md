@@ -24,39 +24,39 @@ WallPanel expone las siguientes funciones JavaScript que utilizamos en el Interc
 ```javascript
 // Verificar si la aplicación se está ejecutando en WallPanel
 function isWallPanelAvailable() {
-    return typeof window.WallPanel !== 'undefined';
+  return typeof window.WallPanel !== 'undefined';
 }
 
 // Obtener ID único del dispositivo
 function getWallPanelDeviceId() {
-    if (isWallPanelAvailable()) {
-        return window.WallPanel.getDeviceId();
-    }
-    return null;
+  if (isWallPanelAvailable()) {
+    return window.WallPanel.getDeviceId();
+  }
+  return null;
 }
 
 // Obtener el ID único de Android
 function getWallPanelAndroidId() {
-    if (isWallPanelAvailable()) {
-        return window.WallPanel.getAndroidId();
-    }
-    return null;
+  if (isWallPanelAvailable()) {
+    return window.WallPanel.getAndroidId();
+  }
+  return null;
 }
 
 // Obtener información del fabricante del dispositivo
 function getWallPanelManufacturer() {
-    if (isWallPanelAvailable()) {
-        return window.WallPanel.getDeviceManufacturer();
-    }
-    return null;
+  if (isWallPanelAvailable()) {
+    return window.WallPanel.getDeviceManufacturer();
+  }
+  return null;
 }
 
 // Obtener el modelo del dispositivo
 function getWallPanelModel() {
-    if (isWallPanelAvailable()) {
-        return window.WallPanel.getDeviceModel();
-    }
-    return null;
+  if (isWallPanelAvailable()) {
+    return window.WallPanel.getDeviceModel();
+  }
+  return null;
 }
 ```
 

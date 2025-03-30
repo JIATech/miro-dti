@@ -74,12 +74,12 @@ const CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutos
 
 function checkForUpdates() {
   console.log('[Service Worker] Checking for updates...');
-  
+
   fetch('/config/version.json?_=' + new Date().getTime(), {
-    cache: 'no-store'
+    cache: 'no-store',
   })
-    .then(response => response.json())
-    .then(data => {
+    .then((response) => response.json())
+    .then((data) => {
       const newVersion = data.version;
       // Procesar actualizaciones...
     });
@@ -92,18 +92,18 @@ El servidor de administración incluye un endpoint para notificar a las tablets:
 
 ```javascript
 app.post('/api/notify-update', async (req, res) => {
-    try {
-        const { version, force = false } = req.body;
-        
-        // Publicar mensaje MQTT para notificar a todas las tablets
-        if (mqttClient && mqttClient.connected) {
-            mqttClient.publish('intercom/update/notification', JSON.stringify(versionData));
-        }
-        
-        // Registrar evento...
-    } catch (error) {
-        // Manejar errores...
+  try {
+    const { version, force = false } = req.body;
+
+    // Publicar mensaje MQTT para notificar a todas las tablets
+    if (mqttClient && mqttClient.connected) {
+      mqttClient.publish('intercom/update/notification', JSON.stringify(versionData));
     }
+
+    // Registrar evento...
+  } catch (error) {
+    // Manejar errores...
+  }
 });
 ```
 
@@ -114,13 +114,13 @@ El archivo `pwa/public/js/update-manager.js` implementa la lógica para recibir 
 ```javascript
 // Escuchar mensajes MQTT para actualizaciones
 if (window.wallpanel && typeof window.wallpanel.mqtt !== 'undefined') {
-    window.wallpanel.mqtt.subscribe('intercom/update/notification');
-    
-    window.wallpanel.mqtt.onMessage = (topic, message) => {
-        if (topic === 'intercom/update/notification') {
-            // Procesar notificación de actualización...
-        }
-    };
+  window.wallpanel.mqtt.subscribe('intercom/update/notification');
+
+  window.wallpanel.mqtt.onMessage = (topic, message) => {
+    if (topic === 'intercom/update/notification') {
+      // Procesar notificación de actualización...
+    }
+  };
 }
 ```
 
@@ -129,25 +129,30 @@ if (window.wallpanel && typeof window.wallpanel.mqtt !== 'undefined') {
 ### Flujo de Despliegue Automatizado
 
 1. **Desarrollo**:
+
    - Los desarrolladores realizan cambios en su entorno local
    - Prueban los cambios y crean un Pull Request
 
 2. **Revisión y Aprobación**:
+
    - Revisión de código por otros desarrolladores
    - Pruebas automatizadas para validar cambios
    - Aprobación y merge a la rama principal
 
 3. **Construcción y Publicación**:
+
    - GitHub Actions detecta el push a main
    - Construye imágenes Docker para cada componente
    - Publica las imágenes en GitHub Container Registry
    - Etiqueta las imágenes con la versión actual
 
 4. **Despliegue en Staging**:
+
    - Se despliegan automáticamente en el entorno de staging
    - Se ejecutan pruebas de integración
 
 5. **Despliegue en Producción**:
+
    - Despliegue automático o manual según configuración
    - Notificación a las tablets sobre la actualización disponible
 
@@ -159,6 +164,7 @@ if (window.wallpanel && typeof window.wallpanel.mqtt !== 'undefined') {
 ### Versiones y Etiquetado
 
 Cada versión desplegada se etiqueta con:
+
 - Fecha de compilación (YYYYMMDD)
 - Hash corto del commit (7 caracteres)
 - Ejemplo: `20250330-a1b2c3d`
@@ -170,7 +176,7 @@ Cada versión desplegada se etiqueta con:
 1. **Secrets de GitHub**:
 
    Es necesario configurar los siguientes secrets en el repositorio:
-   
+
    - `STAGING_HOST`: Dirección IP del servidor de staging
    - `STAGING_USERNAME`: Usuario SSH para staging
    - `STAGING_SSH_KEY`: Clave SSH para staging
@@ -181,7 +187,7 @@ Cada versión desplegada se etiqueta con:
 2. **Entornos de GitHub**:
 
    Crear dos entornos en la configuración del repositorio:
-   
+
    - `staging`: Para despliegues de prueba
    - `production`: Para despliegues en producción (con aprobación requerida)
 
@@ -210,11 +216,13 @@ Cada versión desplegada se etiqueta con:
 ### Problemas Comunes y Soluciones
 
 1. **La tablet no recibe la actualización**:
+
    - Verificar conexión MQTT en la tablet
    - Comprobar que el Service Worker esté registrado
    - Forzar actualización desde el panel de administración
 
 2. **Fallos en el pipeline de CI/CD**:
+
    - Verificar que las credenciales SSH estén configuradas correctamente
    - Comprobar acceso a GitHub Container Registry
    - Verificar que el servidor de despliegue tenga permisos para hacer pull de las imágenes
@@ -228,10 +236,12 @@ Cada versión desplegada se etiqueta con:
 ### Consideraciones de Seguridad
 
 1. **Protección de Credenciales**:
+
    - Todas las claves y secretos se almacenan en GitHub Secrets
    - No se incluyen credenciales en el código fuente
 
 2. **Acceso a Servidores**:
+
    - Se utilizan claves SSH con acceso limitado
    - Solo los puertos necesarios están abiertos en los servidores
 

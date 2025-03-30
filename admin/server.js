@@ -1071,12 +1071,10 @@ app.post('/api/notify-update', async (req, res) => {
     const { version, force = false } = req.body;
 
     if (!version) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: 'Se requiere versión para la notificación de actualización',
-        });
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere versión para la notificación de actualización',
+      });
     }
 
     logger.info(`Notificando actualización versión ${version} a todas las tablets`, { force });
@@ -1230,16 +1228,16 @@ function addLog(type, message, data = {}) {
     type,
     message,
     data,
-    service: 'admin'
+    service: 'admin',
   };
-  
+
   logger.info(message, { type, ...data });
-  
+
   // Emitir a través de socket.io si está disponible
   if (io) {
     io.emit('log', logEntry);
   }
-  
+
   return logEntry;
 }
 
@@ -1381,12 +1379,12 @@ function processLogLine(service, line) {
     service,
     message: line,
   };
-  
+
   // Emitir a través de socket.io si está disponible
   if (io) {
     io.emit('log', logObj);
   }
-  
+
   // Actualizar estadísticas
   updateStats(service, line);
 }

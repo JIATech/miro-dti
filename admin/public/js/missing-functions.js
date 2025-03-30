@@ -184,10 +184,10 @@ window.applyFilter = function () {
     // Filtrar logs según el texto
     const filteredLogs = filterText
       ? logs.filter(
-        (log) =>
-          log.message?.toLowerCase().includes(filterText) ||
+          (log) =>
+            log.message?.toLowerCase().includes(filterText) ||
             log.component?.toLowerCase().includes(filterText)
-      )
+        )
       : logs;
 
     // Actualizar vista
@@ -231,35 +231,35 @@ window.performServiceAction = function (action, service) {
 
   // Mostrar diálogo de confirmación según la acción
   switch (action) {
-  case 'restart':
-    window.showConfirmDialog(
-      'Reiniciar Servicio',
-      `¿Está seguro que desea reiniciar el servicio ${service}?`,
-      'restart-service',
-      service
-    );
-    break;
+    case 'restart':
+      window.showConfirmDialog(
+        'Reiniciar Servicio',
+        `¿Está seguro que desea reiniciar el servicio ${service}?`,
+        'restart-service',
+        service
+      );
+      break;
 
-  case 'stop':
-    window.showConfirmDialog(
-      'Detener Servicio',
-      `¿Está seguro que desea detener el servicio ${service}?`,
-      'stop-service',
-      service
-    );
-    break;
+    case 'stop':
+      window.showConfirmDialog(
+        'Detener Servicio',
+        `¿Está seguro que desea detener el servicio ${service}?`,
+        'stop-service',
+        service
+      );
+      break;
 
-  case 'start':
-    window.showConfirmDialog(
-      'Iniciar Servicio',
-      `¿Está seguro que desea iniciar el servicio ${service}?`,
-      'start-service',
-      service
-    );
-    break;
+    case 'start':
+      window.showConfirmDialog(
+        'Iniciar Servicio',
+        `¿Está seguro que desea iniciar el servicio ${service}?`,
+        'start-service',
+        service
+      );
+      break;
 
-  default:
-    window.showToast('Error', `Acción desconocida: ${action}`, 'danger');
+    default:
+      window.showToast('Error', `Acción desconocida: ${action}`, 'danger');
   }
 };
 
@@ -412,8 +412,8 @@ window.updateServicesUI = function (services) {
       <td>
         <div class="btn-group btn-group-sm">
           ${
-  info.status === 'running'
-    ? `
+            info.status === 'running'
+              ? `
             <button class="btn btn-warning" data-action="restart" data-service="${name}">
               <i class="bi bi-arrow-repeat"></i> Reiniciar
             </button>
@@ -421,12 +421,12 @@ window.updateServicesUI = function (services) {
               <i class="bi bi-stop-fill"></i> Detener
             </button>
           `
-    : `
+              : `
             <button class="btn btn-success" data-action="start" data-service="${name}">
               <i class="bi bi-play-fill"></i> Iniciar
             </button>
           `
-}
+          }
         </div>
       </td>
     `;

@@ -106,12 +106,12 @@ function updateLogDisplay(logs, containerId, showTimestamps = true) {
         const timestamp = new Date(log.timestamp);
         // Check if timestamp is valid before formatting
         if (!isNaN(timestamp)) {
-           logText += `<span class="log-time">${timestamp.toLocaleTimeString()}</span> `;
+          logText += `<span class="log-time">${timestamp.toLocaleTimeString()}</span> `;
         } else {
-           logText += `<span class="log-time">[Invalid Date]</span> `;
+          logText += '<span class="log-time">[Invalid Date]</span> ';
         }
       } catch (e) {
-         logText += `<span class="log-time">[Date Error]</span> `;
+        logText += '<span class="log-time">[Date Error]</span> ';
       }
     }
 
@@ -143,10 +143,10 @@ function updateServiceStatus(service, status) {
 
   // Update status in the global state object if it exists
   if (window.appState && window.appState.services && window.appState.services.status) {
-     // Ensure the service exists in the status object before updating
-     if (typeof window.appState.services.status[service] !== 'undefined') {
-       window.appState.services.status[service] = status;
-     }
+    // Ensure the service exists in the status object before updating
+    if (typeof window.appState.services.status[service] !== 'undefined') {
+      window.appState.services.status[service] = status;
+    }
   }
 }
 
@@ -178,8 +178,8 @@ function handleDeviceResponse(data) {
   console.log('Handling device response:', data);
 
   if (!data || typeof data !== 'object') {
-     showToast('Error', 'Invalid response received from device action.', 'danger');
-     return;
+    showToast('Error', 'Invalid response received from device action.', 'danger');
+    return;
   }
 
   const deviceName = data.deviceName || data.deviceId || 'Unknown Device';
@@ -206,7 +206,6 @@ function handleDeviceResponse(data) {
   }
 }
 
-
 // Function to apply the selected theme (dark/light)
 function applyTheme(theme) {
   if (theme !== 'dark' && theme !== 'light') {
@@ -223,7 +222,6 @@ function applyTheme(theme) {
     console.error('Failed to save theme preference to localStorage:', e);
   }
 
-
   // Update the theme switch UI element if it exists
   const themeSwitch = document.getElementById('theme-switch');
   if (themeSwitch) {
@@ -237,8 +235,8 @@ function applyTheme(theme) {
 function saveGeneralSettings() {
   // Check for socket connection first
   if (!window.socket || !window.socket.connected) {
-     showToast('Error', 'Cannot save settings. No connection to the server.', 'danger');
-     return;
+    showToast('Error', 'Cannot save settings. No connection to the server.', 'danger');
+    return;
   }
 
   try {
@@ -251,34 +249,37 @@ function saveGeneralSettings() {
 
     // Basic validation
     if (isNaN(settings.logsRetentionDays) || settings.logsRetentionDays <= 0) {
-       showToast('Validation Error', 'Log retention must be a positive number of days.', 'warning');
-       return;
+      showToast('Validation Error', 'Log retention must be a positive number of days.', 'warning');
+      return;
     }
-     if (isNaN(settings.uiRefreshIntervalSeconds) || settings.uiRefreshIntervalSeconds < 5) {
-       showToast('Validation Error', 'UI Refresh interval must be at least 5 seconds.', 'warning');
-       return;
+    if (isNaN(settings.uiRefreshIntervalSeconds) || settings.uiRefreshIntervalSeconds < 5) {
+      showToast('Validation Error', 'UI Refresh interval must be at least 5 seconds.', 'warning');
+      return;
     }
     // Add more validation as needed (e.g., URL format)
 
     window.socket.emit('save-settings', { type: 'general', settings }, (response) => {
-       if (response && response.success) {
-           showToast('Settings Saved', 'General settings saved successfully.', 'success');
-       } else {
-           showToast('Error Saving Settings', response?.message || 'Failed to save general settings.', 'danger');
-       }
+      if (response && response.success) {
+        showToast('Settings Saved', 'General settings saved successfully.', 'success');
+      } else {
+        showToast(
+          'Error Saving Settings',
+          response?.message || 'Failed to save general settings.',
+          'danger'
+        );
+      }
     });
-
   } catch (error) {
-     console.error('Error preparing general settings:', error);
-     showToast('Error', 'Could not read settings from the form.', 'danger');
+    console.error('Error preparing general settings:', error);
+    showToast('Error', 'Could not read settings from the form.', 'danger');
   }
 }
 
 function saveTabletsSettings() {
-   // Check for socket connection first
+  // Check for socket connection first
   if (!window.socket || !window.socket.connected) {
-     showToast('Error', 'Cannot save settings. No connection to the server.', 'danger');
-     return;
+    showToast('Error', 'Cannot save settings. No connection to the server.', 'danger');
+    return;
   }
 
   try {
@@ -288,40 +289,53 @@ function saveTabletsSettings() {
       offlineTimeoutSeconds: parseInt(document.getElementById('offline-timeout').value, 10),
     };
 
-     // Basic validation
+    // Basic validation
     if (isNaN(settings.heartbeatIntervalSeconds) || settings.heartbeatIntervalSeconds <= 0) {
-       showToast('Validation Error', 'Heartbeat interval must be a positive number of seconds.', 'warning');
-       return;
+      showToast(
+        'Validation Error',
+        'Heartbeat interval must be a positive number of seconds.',
+        'warning'
+      );
+      return;
     }
-     if (isNaN(settings.offlineTimeoutSeconds) || settings.offlineTimeoutSeconds <= settings.heartbeatIntervalSeconds) {
-       showToast('Validation Error', 'Offline timeout must be greater than the heartbeat interval.', 'warning');
-       return;
+    if (
+      isNaN(settings.offlineTimeoutSeconds) ||
+      settings.offlineTimeoutSeconds <= settings.heartbeatIntervalSeconds
+    ) {
+      showToast(
+        'Validation Error',
+        'Offline timeout must be greater than the heartbeat interval.',
+        'warning'
+      );
+      return;
     }
 
-     window.socket.emit('save-settings', { type: 'tablets', settings }, (response) => {
-       if (response && response.success) {
-           showToast('Settings Saved', 'Tablet settings saved successfully.', 'success');
-       } else {
-           showToast('Error Saving Settings', response?.message || 'Failed to save tablet settings.', 'danger');
-       }
+    window.socket.emit('save-settings', { type: 'tablets', settings }, (response) => {
+      if (response && response.success) {
+        showToast('Settings Saved', 'Tablet settings saved successfully.', 'success');
+      } else {
+        showToast(
+          'Error Saving Settings',
+          response?.message || 'Failed to save tablet settings.',
+          'danger'
+        );
+      }
     });
-
   } catch (error) {
-     console.error('Error preparing tablet settings:', error);
-     showToast('Error', 'Could not read tablet settings from the form.', 'danger');
+    console.error('Error preparing tablet settings:', error);
+    showToast('Error', 'Could not read tablet settings from the form.', 'danger');
   }
 }
 
-
 function changeAdminPassword(event) {
   if (event) {
-     event.preventDefault(); // Prevent default form submission if called from an event
+    event.preventDefault(); // Prevent default form submission if called from an event
   }
 
   // Check for socket connection first
   if (!window.socket || !window.socket.connected) {
-     showToast('Error', 'Cannot change password. No connection to the server.', 'danger');
-     return;
+    showToast('Error', 'Cannot change password. No connection to the server.', 'danger');
+    return;
   }
 
   const currentPasswordInput = document.getElementById('current-password');
@@ -338,9 +352,10 @@ function changeAdminPassword(event) {
     return;
   }
 
-  if (newPassword.length < 8) { // Example: Enforce minimum length
-     showToast('Validation Error', 'New password must be at least 8 characters long.', 'warning');
-     return;
+  if (newPassword.length < 8) {
+    // Example: Enforce minimum length
+    showToast('Validation Error', 'New password must be at least 8 characters long.', 'warning');
+    return;
   }
 
   if (newPassword !== confirmPassword) {
@@ -348,32 +363,38 @@ function changeAdminPassword(event) {
     return;
   }
 
-   if (newPassword === currentPassword) {
-    showToast('Validation Error', 'New password cannot be the same as the current password.', 'warning');
+  if (newPassword === currentPassword) {
+    showToast(
+      'Validation Error',
+      'New password cannot be the same as the current password.',
+      'warning'
+    );
     return;
   }
 
-
   // Send request to server via Socket.IO
   window.socket.emit('change-password', { currentPassword, newPassword }, (response) => {
-      if (response && response.success) {
-          showToast('Password Changed', 'Admin password updated successfully.', 'success');
-          // Clear password fields after successful change
-          currentPasswordInput.value = '';
-          newPasswordInput.value = '';
-          confirmPasswordInput.value = '';
-      } else {
-          showToast('Error Changing Password', response?.message || 'Failed to change password. Check current password.', 'danger');
-      }
+    if (response && response.success) {
+      showToast('Password Changed', 'Admin password updated successfully.', 'success');
+      // Clear password fields after successful change
+      currentPasswordInput.value = '';
+      newPasswordInput.value = '';
+      confirmPasswordInput.value = '';
+    } else {
+      showToast(
+        'Error Changing Password',
+        response?.message || 'Failed to change password. Check current password.',
+        'danger'
+      );
+    }
   });
 }
 
-
 function clearLogsByTimePeriod(timePeriod) {
-   // Check for socket connection first
+  // Check for socket connection first
   if (!window.socket || !window.socket.connected) {
-     showToast('Error', 'Cannot clear logs. No connection to the server.', 'danger');
-     return;
+    showToast('Error', 'Cannot clear logs. No connection to the server.', 'danger');
+    return;
   }
 
   let cutoffTimeISO;
@@ -396,9 +417,9 @@ function clearLogsByTimePeriod(timePeriod) {
       cutoffTimeISO = new Date(now - 30 * 24 * 3600 * 1000).toISOString();
       break;
     case 'all':
-       // No cutoff time needed, server should handle 'all' specifically
-       cutoffTimeISO = null; // Or a specific value server understands for 'all'
-       break;
+      // No cutoff time needed, server should handle 'all' specifically
+      cutoffTimeISO = null; // Or a specific value server understands for 'all'
+      break;
     default:
       showToast('Error', 'Invalid time period selected for clearing logs.', 'warning');
       return;
@@ -406,21 +427,24 @@ function clearLogsByTimePeriod(timePeriod) {
 
   const payload = { timePeriod }; // Send the period identifier
   if (cutoffTimeISO) {
-     payload.before = cutoffTimeISO; // Optionally send calculated time if server needs it
+    payload.before = cutoffTimeISO; // Optionally send calculated time if server needs it
   }
 
   console.log(`Requesting log clear for period: ${timePeriod}`);
   window.socket.emit('clear-logs', payload, (response) => {
-      if (response && response.success) {
-          showToast('Logs Cleared', `Logs older than ${timePeriod} (or all) cleared successfully. Count: ${response.count || 0}`, 'success');
-          // Optionally trigger a refresh of the log view
-          // Example: if (window.requestLogUpdate) { window.requestLogUpdate(); }
-      } else {
-          showToast('Error Clearing Logs', response?.message || 'Failed to clear logs.', 'danger');
-      }
+    if (response && response.success) {
+      showToast(
+        'Logs Cleared',
+        `Logs older than ${timePeriod} (or all) cleared successfully. Count: ${response.count || 0}`,
+        'success'
+      );
+      // Optionally trigger a refresh of the log view
+      // Example: if (window.requestLogUpdate) { window.requestLogUpdate(); }
+    } else {
+      showToast('Error Clearing Logs', response?.message || 'Failed to clear logs.', 'danger');
+    }
   });
 }
-
 
 // --- Initialization and Global Exposure ---
 
@@ -442,7 +466,7 @@ const globalFunctions = {
 
 // Conditionally expose functions to the window object if in a browser environment
 if (typeof window !== 'undefined') {
-  Object.keys(globalFunctions).forEach(key => {
+  Object.keys(globalFunctions).forEach((key) => {
     window[key] = globalFunctions[key];
   });
 
@@ -459,38 +483,37 @@ if (typeof window !== 'undefined') {
       });
     }
 
-     // Add event listeners for save buttons etc. if they exist
-     // Example for General Settings Save Button
-     const saveGeneralBtn = document.getElementById('save-general-settings-btn');
-     if (saveGeneralBtn) {
-         saveGeneralBtn.addEventListener('click', saveGeneralSettings);
-     }
+    // Add event listeners for save buttons etc. if they exist
+    // Example for General Settings Save Button
+    const saveGeneralBtn = document.getElementById('save-general-settings-btn');
+    if (saveGeneralBtn) {
+      saveGeneralBtn.addEventListener('click', saveGeneralSettings);
+    }
 
-      // Example for Tablets Settings Save Button
-     const saveTabletsBtn = document.getElementById('save-tablets-settings-btn');
-     if (saveTabletsBtn) {
-         saveTabletsBtn.addEventListener('click', saveTabletsSettings);
-     }
+    // Example for Tablets Settings Save Button
+    const saveTabletsBtn = document.getElementById('save-tablets-settings-btn');
+    if (saveTabletsBtn) {
+      saveTabletsBtn.addEventListener('click', saveTabletsSettings);
+    }
 
-      // Example for Change Password Form
-     const changePasswordForm = document.getElementById('change-password-form');
-     if (changePasswordForm) {
-         changePasswordForm.addEventListener('submit', changeAdminPassword);
-     }
+    // Example for Change Password Form
+    const changePasswordForm = document.getElementById('change-password-form');
+    if (changePasswordForm) {
+      changePasswordForm.addEventListener('submit', changeAdminPassword);
+    }
 
-      // Example for Log Clearing Buttons (using event delegation might be better)
-     const logClearControls = document.getElementById('log-clear-controls'); // Assuming a container
-     if (logClearControls) {
-         logClearControls.addEventListener('click', (event) => {
-            if (event.target.matches('button[data-clear-period]')) {
-                const period = event.target.getAttribute('data-clear-period');
-                if (period) {
-                    clearLogsByTimePeriod(period);
-                }
-            }
-         });
-     }
-
+    // Example for Log Clearing Buttons (using event delegation might be better)
+    const logClearControls = document.getElementById('log-clear-controls'); // Assuming a container
+    if (logClearControls) {
+      logClearControls.addEventListener('click', (event) => {
+        if (event.target.matches('button[data-clear-period]')) {
+          const period = event.target.getAttribute('data-clear-period');
+          if (period) {
+            clearLogsByTimePeriod(period);
+          }
+        }
+      });
+    }
   });
 }
 

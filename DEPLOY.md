@@ -27,21 +27,21 @@ El sistema Intercom DTI se compone de los siguientes componentes principales:
 - **Panel Admin**: Aplicación web para monitoreo y administración del sistema
 - **MongoDB**: Base de datos para autenticación y configuración del sistema
 
-
 ## Requisitos de Hardware y Red
 
 ### Hardware Recomendado
 
-| Componente | Mínimo | Recomendado | Notas |
-|------------|--------|-------------|-------|
-| CPU | 4 núcleos | 8+ núcleos | Los procesos de WebRTC son intensivos en CPU |
-| RAM | 8 GB | 16+ GB | MiroTalkSFU requiere memoria para múltiples conexiones |
-| Almacenamiento | 20 GB SSD | 100+ GB SSD | Para logs, MongoDB y posibles grabaciones |
-| Tarjeta de Red | 1 Gbps | 1+ Gbps | Esencial para streaming de video de calidad |
+| Componente     | Mínimo    | Recomendado | Notas                                                  |
+| -------------- | --------- | ----------- | ------------------------------------------------------ |
+| CPU            | 4 núcleos | 8+ núcleos  | Los procesos de WebRTC son intensivos en CPU           |
+| RAM            | 8 GB      | 16+ GB      | MiroTalkSFU requiere memoria para múltiples conexiones |
+| Almacenamiento | 20 GB SSD | 100+ GB SSD | Para logs, MongoDB y posibles grabaciones              |
+| Tarjeta de Red | 1 Gbps    | 1+ Gbps     | Esencial para streaming de video de calidad            |
 
 ### Requisitos de Red
 
 - **Puertos Internos**:
+
   - TCP/80: PWA (interfaz web)
   - TCP/3000: Servicio de señalización
   - TCP/8080: MiroTalkSFU WebRTC
@@ -50,6 +50,7 @@ El sistema Intercom DTI se compone de los siguientes componentes principales:
   - UDP/40000-40100: Rango para tráfico de medios WebRTC
 
 - **Puertos Externos** (si se usa acceso desde internet):
+
   - TCP/80 o TCP/443 (con SSL): Para acceso a la PWA
   - UDP/40000-40100: Para tráfico WebRTC
 
@@ -122,6 +123,7 @@ docker-compose up -d
 ```
 
 Este comando descargará las imágenes necesarias desde Docker Hub y creará los contenedores:
+
 - `dtiteam/intercom-pwa:latest`
 - `dtiteam/intercom-signaling:latest`
 - `dtiteam/intercom-mirotalksfu:latest`
@@ -148,6 +150,7 @@ docker-compose logs -f mirotalksfu
 Todas las imágenes han sido configuradas con las siguientes medidas de seguridad:
 
 - **Usuarios no-root**: Cada servicio se ejecuta como un usuario no privilegiado:
+
   - PWA: usuario `nginx`
   - Signaling: usuario `appuser` (UID 1000)
   - MiroTalkSFU: usuario `mirotalk` (UID 1000)
@@ -192,12 +195,14 @@ Recomendaciones para la configuración de seguridad de red:
 ### Lista de Comprobación Post-Despliegue
 
 1. Verificar respuesta HTTP 200 de todos los servicios web:
+
    - PWA: `http://LOCAL_IP/`
    - Signaling: `http://LOCAL_IP:3000/health`
    - MiroTalkSFU: `http://LOCAL_IP:8080/health`
    - Admin: `http://LOCAL_IP:8090/health`
 
 2. Verificar conexión a MongoDB:
+
    ```bash
    docker-compose exec signaling sh -c "curl -s mongodb:27017"
    ```
@@ -224,6 +229,7 @@ docker inspect --format "{{.State.Health.Status}}" intercom-mongodb
 El sistema se puede integrar con herramientas como Prometheus, Grafana o Zabbix:
 
 1. **Endpoints de Health**:
+
    - `/health` en cada servicio devuelve estado 200 si está operativo
    - Estos endpoints pueden ser consumidos por cualquier sistema de monitoreo
 
@@ -238,17 +244,19 @@ El sistema se puede integrar con herramientas como Prometheus, Grafana o Zabbix:
 El panel de administración proporciona capacidades avanzadas para gestionar logs:
 
 1. **Visualización Centralizada**:
+
    - Log central categorizado (Sistema, Llamadas, Errores, Rendimiento)
    - Filtros por tipo, nivel, fuente y tablet específica
    - Búsqueda en tiempo real de mensajes de logs
 
 2. **Limpieza Manual de Logs por Períodos**:
+
    - Borrado selectivo según intervalos de tiempo predefinidos:
-     * Última hora
-     * Últimas 24 horas
-     * Últimos 7 días
-     * Últimas 4 semanas
-     * Borrado completo (desde siempre)
+     - Última hora
+     - Últimas 24 horas
+     - Últimos 7 días
+     - Últimas 4 semanas
+     - Borrado completo (desde siempre)
    - Confirmación obligatoria antes de borrado para prevenir pérdida accidental de datos
    - Sin borrado automático para garantizar control total sobre los datos históricos
 
@@ -305,6 +313,7 @@ cp docker-compose.yml docker-compose.yml.backup.$(date +%Y%m%d)
 ### Plan de Recuperación ante Desastres
 
 1. **Escenario**: Pérdida completa del servidor
+
    - Aprovisionar nuevo servidor con hardware equivalente
    - Instalar Docker y dependencias
    - Restaurar configuración y datos de MongoDB desde backup
@@ -333,6 +342,7 @@ El sistema está diseñado para funcionar con 5 tablets Android (1 para Portero 
 1. Asegure que las tablets estén conectadas a la misma red que el servidor
 2. Abra Chrome en cada tablet y navegue a `http://LOCAL_IP`
 3. Para cada tablet, seleccione el rol apropiado:
+
    - **Portero**: Puede iniciar llamadas a cualquier departamento
    - **Departamentos** (Administración/Sistemas/Infraestructura/Soporte): Reciben llamadas
 
@@ -353,12 +363,12 @@ El panel de administración permite monitorear el estado de todas las tablets co
 
 ### Problemas Comunes
 
-| Problema | Posible Causa | Solución |
-|----------|---------------|----------|
-| No se puede realizar llamadas | Puertos UDP bloqueados | Verificar firewall para tráfico UDP 40000-40100 |
-| Video lento o congelado | Ancho de banda insuficiente | Verificar QoS o disponibilidad de red |
+| Problema                      | Posible Causa                    | Solución                                            |
+| ----------------------------- | -------------------------------- | --------------------------------------------------- |
+| No se puede realizar llamadas | Puertos UDP bloqueados           | Verificar firewall para tráfico UDP 40000-40100     |
+| Video lento o congelado       | Ancho de banda insuficiente      | Verificar QoS o disponibilidad de red               |
 | Error "ICE connection failed" | NAT/Firewall bloqueando conexión | Configurar correctamente LOCAL_IP y FALLBACK_SFU_IP |
-| MongoDB inaccesible | Problema con volumen persistente | Verificar permisos en directorio de datos |
+| MongoDB inaccesible           | Problema con volumen persistente | Verificar permisos en directorio de datos           |
 
 ### Logs y Diagnóstico
 
@@ -396,6 +406,7 @@ docker-compose up -d --build
 ### Flujos de Tráfico
 
 1. **Llamada Normal** (red interna):
+
    - Conexión inicial PWA → Signaling Server
    - Negociación WebRTC a través de MiroTalkSFU local
    - Flujo directo de audio/video por UDP
