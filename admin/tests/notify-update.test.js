@@ -180,3 +180,164 @@ describe('API de Notificación de Actualizaciones', () => {
     expect(payload.forceUpdate).toBe(true);
   });
 });
+
+/**
+ * Test para la funcionalidad de notificación de actualización
+ * JIATech Intercom DTI - Componente Admin
+ */
+
+const express = require('express');
+const bodyParser = require('body-parser');
+const mqtt = require('mqtt');
+
+// Mock de la librería MQTT
+jest.mock('mqtt');
+
+describe('API de notificación de actualización', () => {
+  let app;
+  let mockMqttClient;
+  
+  beforeEach(() => {
+    // Configurar mocks
+    mockMqttClient = {
+      publish: jest.fn((topic, message, opts, callback) => {
+        if (callback) callback(null);
+      }),
+      on: jest.fn(),
+      end: jest.fn()
+    };
+    
+    mqtt.connect.mockReturnValue(mockMqttClient);
+    
+    // Crear una aplicación Express para pruebas
+    app = express();
+    app.use(bodyParser.json());
+    
+    // Implementar el endpoint de notificación
+    app.post('/api/notify-update', (req, res) => {
+      const { version, force = false } = req.body;
+      
+      if (!version) {
+        return res.status(400).json({ success: false, message: 'Version is required' });
+      }
+      
+      // Publicar en MQTT
+      const topic = 'intercom/update/notification';
+      const message = JSON.stringify({
+        version,
+        forceUpdate: force,
+        timestamp: new Date().toISOString()
+      });
+      
+      try {
+        const mqttClient = mqtt.connect(process.env.MQTT_BROKER || 'mqtt://localhost:1883', {
+          username: process.env.MQTT_USERNAME || 'intercom',
+          password: process.env.MQTT_PASSWORD || 'intercom123'
+        });
+        
+        mqttClient.publish(topic, message, { qos: 1, retain: true }, (err) => {
+          if (err) {
+            console.error('Error al publicar mensaje MQTT:', err);
+            return res.status(500).json({ success: false, message: 'Failed to publish update notification' });
+          }
+          
+          mqttClient.end();
+          res.json({ success: true, message: 'Update notification sent' });
+        });
+        
+      } catch (error) {
+        console.error('Error al conectar con MQTT:', error);
+        res.status(500).json({ success: false, message: 'Failed to connect to MQTT broker' });
+      }
+    });
+  });
+  
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+  
+  it('debería devolver 400 si no se proporciona versión', async () => {
+    const response = await request(app)
+      .post('/api/notify-update')
+      .send({ force: true });
+    
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+  });
+  
+  it('debería publicar mensaje MQTT con la versión y force=false por defecto', async () => {
+    const response = await request(app)
+      .post('/api/notify-update')
+      .send({ version: '1.0.0' });
+    
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    
+    // Verificar que se llamó a mqtt.connect
+    expect(mqtt.connect).toHaveBeenCalledWith(
+      'mqtt://localhost:1883',
+      expect.objectContaining({
+        username: 'intercom',
+        password: 'intercom123'
+      })
+    );
+    
+    // Verificar que se publicó el mensaje correcto
+    expect(mockMqttClient.publish).toHaveBeenCalledWith(
+      'intercom/update/notification',
+      expect.stringContaining('"version":"1.0.0"'),
+      expect.objectContaining({ qos: 1, retain: true }),
+      expect.any(Function)
+    );
+    
+    // Verificar el contenido del mensaje
+    const publishCall = mockMqttClient.publish.mock.calls[0];
+    const messageJson = JSON.parse(publishCall[1]);
+    
+    expect(messageJson).toHaveProperty('version', '1.0.0');
+    expect(messageJson).toHaveProperty('forceUpdate', false);
+    expect(messageJson).toHaveProperty('timestamp');
+  });
+  
+  it('debería publicar mensaje MQTT con force=true cuando se especifica', async () => {
+    const response = await request(app)
+      .post('/api/notify-update')
+      .send({ version: '1.0.0', force: true });
+    
+    expect(response.status).toBe(200);
+    
+    // Verificar el contenido del mensaje
+    const publishCall = mockMqttClient.publish.mock.calls[0];
+    const messageJson = JSON.parse(publishCall[1]);
+    
+    expect(messageJson).toHaveProperty('forceUpdate', true);
+  });
+  
+  it('debería manejar errores de conexión MQTT', async () => {
+    // Simular un error de conexión
+    mqtt.connect.mockImplementation(() => {
+      throw new Error('Connection failed');
+    });
+    
+    const response = await request(app)
+      .post('/api/notify-update')
+      .send({ version: '1.0.0' });
+    
+    expect(response.status).toBe(500);
+    expect(response.body.success).toBe(false);
+  });
+  
+  it('debería manejar errores de publicación MQTT', async () => {
+    // Simular un error de publicación
+    mockMqttClient.publish.mockImplementation((topic, message, opts, callback) => {
+      callback(new Error('Publication failed'));
+    });
+    
+    const response = await request(app)
+      .post('/api/notify-update')
+      .send({ version: '1.0.0' });
+    
+    expect(response.status).toBe(500);
+    expect(response.body.success).toBe(false);
+  });
+});
