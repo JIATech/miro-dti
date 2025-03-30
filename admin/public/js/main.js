@@ -1,7 +1,7 @@
 /**
- * Panel de Administración - Sistema Intercom
- * Script principal para monitorización en tiempo real
- */
+  * Panel de Administración - Sistema Intercom
+  * Script principal para monitorización en tiempo real
+  */
 
 // Crear namespace global para administrar todas las funciones
 if (!window.IntercomAdmin) {
