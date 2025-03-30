@@ -188,10 +188,6 @@ describe('API de Notificación de Actualizaciones', () => {
 
 const express = require('express');
 const bodyParser = require('body-parser');
-const mqtt = require('mqtt');
-
-// Mock de la librería MQTT
-jest.mock('mqtt');
 
 describe('API de notificación de actualización', () => {
   let app;
