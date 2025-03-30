@@ -1223,7 +1223,25 @@ function updateSystemInfo() {
   };
 }
 
-// ======== FUNCIONES AUXILIARES ========
+// Funciones auxiliares para logs
+function addLog(type, message, data = {}) {
+  const logEntry = {
+    timestamp: new Date(),
+    type,
+    message,
+    data,
+    service: 'admin'
+  };
+  
+  logger.info(message, { type, ...data });
+  
+  // Emitir a través de socket.io si está disponible
+  if (io) {
+    io.emit('log', logEntry);
+  }
+  
+  return logEntry;
+}
 
 // Obtener estado de servicios
 async function getServicesStatus() {
@@ -1363,10 +1381,12 @@ function processLogLine(service, line) {
     service,
     message: line,
   };
-
-  // Emitir a clientes conectados
-  io.emit('log', logObj);
-
+  
+  // Emitir a través de socket.io si está disponible
+  if (io) {
+    io.emit('log', logObj);
+  }
+  
   // Actualizar estadísticas
   updateStats(service, line);
 }
