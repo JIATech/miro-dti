@@ -303,12 +303,13 @@
                                             <th>Versión</th>
                                             <th>Última Conexión</th>
                                             <th>Última Llamada</th>
+                                            <th>Batería</th>
                                             <th>Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody id="tablets-table">
                                         <tr>
-                                            <td colspan="7" class="text-center">Cargando tablets...</td>
+                                            <td colspan="8" class="text-center">Cargando tablets...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -696,6 +697,44 @@
         </div>
     </div>
 
+    <!-- Modal para enviar mensaje Text-to-Speech -->
+    <div class="modal fade" id="speak-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Enviar Mensaje de Voz a <span id="speak-device-name"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="speak-message" class="form-label">Mensaje a reproducir</label>
+                        <textarea class="form-control" id="speak-message" rows="3" placeholder="Escriba el mensaje que se reproducirá como voz en la tablet"></textarea>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="speak-priority" checked>
+                        <label class="form-check-label" for="speak-priority">
+                            Alta prioridad (interrumpe otras acciones)
+                        </label>
+                    </div>
+                    <div id="speak-status" class="alert alert-info d-none">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status" id="speak-spinner">
+                                <span class="visually-hidden">Enviando...</span>
+                            </div>
+                            <span id="speak-status-text">Enviando mensaje...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="send-speak-message">
+                        <i class="bi bi-megaphone me-1"></i> Enviar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de detalles de tablet -->
     <div class="modal fade" id="tablet-details-modal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -793,6 +832,9 @@
                         </button>
                         <button type="button" class="btn btn-outline-danger" id="tablet-action-reset">
                             <i class="bi bi-x-octagon me-1"></i> Reset
+                        </button>
+                        <button type="button" class="btn btn-outline-success" id="tablet-action-speak">
+                            <i class="bi bi-megaphone me-1"></i> Enviar Mensaje
                         </button>
                     </div>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>

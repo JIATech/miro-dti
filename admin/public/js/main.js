@@ -1048,6 +1048,124 @@ function toggleFullscreen() {
     }
 }
 
+// Funciones para manejar el envío de mensajes Text-to-Speech a las tablets
+let currentSpeakDeviceName = null;
+
+// Manejar envío de mensaje TTS a una tablet
+function setupTTSControls() {
+    const speakModal = new bootstrap.Modal(document.getElementById('speak-modal'));
+    const speakButton = document.getElementById('tablet-action-speak');
+    const sendButton = document.getElementById('send-speak-message');
+    const statusBox = document.getElementById('speak-status');
+    const statusText = document.getElementById('speak-status-text');
+    
+    // Abrir modal para enviar mensaje
+    speakButton.addEventListener('click', function() {
+        // Obtener el dispositivo seleccionado actualmente
+        const tablet = appState.tablets.list.find(t => t.deviceId === appState.tablets.selected);
+        if (!tablet) {
+            showToast('Error', 'No se encontró la tablet seleccionada', 'error');
+            return;
+        }
+        
+        // Configurar el modal
+        currentSpeakDeviceName = tablet.deviceName;
+        document.getElementById('speak-device-name').textContent = tablet.deviceName;
+        document.getElementById('speak-message').value = '';
+        statusBox.classList.add('d-none');
+        
+        // Mostrar el modal
+        speakModal.show();
+    });
+    
+    // Enviar el mensaje
+    sendButton.addEventListener('click', function() {
+        const message = document.getElementById('speak-message').value.trim();
+        const priority = document.getElementById('speak-priority').checked;
+        
+        if (!message) {
+            showToast('Error', 'El mensaje no puede estar vacío', 'error');
+            return;
+        }
+        
+        if (!currentSpeakDeviceName) {
+            showToast('Error', 'No se ha seleccionado ninguna tablet', 'error');
+            speakModal.hide();
+            return;
+        }
+        
+        // Mostrar estado de envío
+        statusBox.classList.remove('d-none');
+        statusText.textContent = 'Enviando mensaje...';
+        document.getElementById('speak-spinner').style.display = 'inline-block';
+        sendButton.disabled = true;
+        
+        // Enviar la solicitud al servidor
+        fetch(`/api/tablets/${currentSpeakDeviceName}/command`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                command: 'speak',
+                value: {
+                    text: message,
+                    priority: priority
+                }
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                statusText.textContent = 'Mensaje enviado correctamente! Reproduciéndose en la tablet...';
+                document.getElementById('speak-spinner').style.display = 'none';
+                
+                // Cerrar automáticamente después de 3 segundos
+                setTimeout(() => {
+                    speakModal.hide();
+                    showToast('Éxito', `Mensaje enviado a ${currentSpeakDeviceName}`, 'success');
+                    sendButton.disabled = false;
+                }, 3000);
+            } else {
+                throw new Error(data.message || 'Error desconocido');
+            }
+        })
+        .catch(error => {
+            statusBox.classList.add('alert-danger');
+            statusBox.classList.remove('alert-info');
+            statusText.textContent = `Error: ${error.message}`;
+            document.getElementById('speak-spinner').style.display = 'none';
+            sendButton.disabled = false;
+        });
+    });
+}
+
+// Manejador para respuestas de los dispositivos WallPanel
+function handleDeviceResponse(data) {
+    const { deviceId, command, data: responseData } = data;
+    
+    // Buscar la tablet en la lista
+    const tablet = appState.tablets.list.find(t => t.deviceId === deviceId);
+    if (!tablet) return;
+    
+    // Notificar al usuario según el tipo de comando
+    if (command === 'speak') {
+        if (responseData.success) {
+            showToast('Confirmación', `Mensaje reproducido en ${tablet.deviceName}`, 'success');
+        } else {
+            showToast('Error', `No se pudo reproducir el mensaje en ${tablet.deviceName}: ${responseData.error}`, 'error');
+        }
+    }
+    
+    // Actualizar logs para la tablet
+    addLogToCollection('tablets', {
+        timestamp: new Date(),
+        device: tablet.deviceName,
+        level: responseData.success ? 'info' : 'error',
+        message: `Respuesta de comando ${command}: ${JSON.stringify(responseData)}`
+    });
+}
+
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
     // Inicializar interfaz
@@ -1056,11 +1174,39 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inicializar gráficos
     initializeCharts();
     
+    // Configurar controles de text-to-speech
+    setupTTSControls();
+    
     // Cargar datos iniciales
     loadInitialData();
     
-    // Conectar con Socket.IO
+    // Conectar Socket.IO
     connectSocket();
+    
+    // Actualizar estado inicial
+    updateConnectionStatus('connecting');
+    
+    // Configurar las pestañas
+    const triggerTabList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tab"]'));
+    triggerTabList.forEach(triggerEl => {
+        const tabTrigger = new bootstrap.Tab(triggerEl);
+        triggerEl.addEventListener('click', event => {
+            event.preventDefault();
+            tabTrigger.show();
+        });
+    });
+    
+    // Inicializar tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Inicializar toast
+    toastInstance = new bootstrap.Toast(document.getElementById('notification-toast'));
+    
+    // Inicializar modal de confirmación
+    confirmModal = new bootstrap.Modal(document.getElementById('confirm-modal'));
     
     // Configurar event listeners para el menú de borrado de logs por período
     document.querySelectorAll('#clear-logs-dropdown + .dropdown-menu .dropdown-item').forEach(button => {
@@ -1074,6 +1220,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedTheme = localStorage.getItem('theme') || 'light';
     applyTheme(savedTheme);
     document.querySelector(`input[name="theme-option"][value="${savedTheme}"]`).checked = true;
+    
+    // Refrescar datos de servicios cada 30 segundos
+    setInterval(fetchServiceStatus, 30000);
+    
+    // Refrescar estadísticas del sistema cada 10 segundos
+    setInterval(fetchSystemStats, 10000);
+    
+    // Refrescar lista de tablets cada 60 segundos
+    setInterval(loadTablets, 60000);
 });
 
 // Exportar funciones para uso global o debug

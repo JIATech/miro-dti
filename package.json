@@ -1,0 +1,41 @@
+{
+  "name": "intercom-dti",
+  "version": "1.0.0",
+  "description": "Sistema Intercom DTI con integración GitOps",
+  "main": "index.js",
+  "scripts": {
+    "test": "concurrently \"cd pwa && npm test\" \"cd admin && npm test\" \"cd signaling && npm test\"",
+    "test:e2e": "mocha tests/e2e/*.test.js",
+    "coverage": "concurrently \"cd pwa && npm run coverage\" \"cd admin && npm run coverage\" \"cd signaling && npm run coverage\"",
+    "coverage:report": "istanbul-merge coverage/*/coverage-final.json | istanbul report --dir ./coverage-combined html",
+    "lint": "eslint ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JIATech/miro-dti.git"
+  },
+  "keywords": [
+    "intercom",
+    "dti",
+    "webrtc",
+    "gitops",
+    "automation"
+  ],
+  "author": "JIATech",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/JIATech/miro-dti/issues"
+  },
+  "homepage": "https://github.com/JIATech/miro-dti#readme",
+  "devDependencies": {
+    "axios": "^1.6.0",
+    "chai": "^4.3.7",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.45.0",
+    "istanbul-merge": "^2.0.0",
+    "mocha": "^10.2.0",
+    "mqtt": "^5.0.5",
+    "ngrok": "^5.0.0-beta.2",
+    "nyc": "^15.1.0"
+  }
+}

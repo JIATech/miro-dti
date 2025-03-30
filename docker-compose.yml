@@ -22,11 +22,11 @@ services:
       - intercom-network
     depends_on:
       - signaling
-      - mirotalksfu
+      - mirotalksfu-lite
     environment:
       - NODE_ENV=production
       # Valores iniciales para PWA - Se pueden cambiar desde la interfaz
-      - LOCAL_SFU_URL=http://mirotalksfu:8080
+      - LOCAL_SFU_URL=http://mirotalksfu-lite:3000
       - FALLBACK_SFU_URL=${FALLBACK_SFU_IP:-https://fallback-server.example.com:8080}
       - SIGNALING_URL=http://signaling:3000
     healthcheck:
@@ -78,36 +78,34 @@ services:
     #       cpus: '1'
     #       memory: 512M
 
-  mirotalksfu:
+  mirotalksfu-lite:
     build: 
-      context: ./mirotalksfu
+      context: ./mirotalksfu-lite
       dockerfile: Dockerfile
-    image: dtiteam/intercom-mirotalksfu:latest
-    container_name: intercom-mirotalksfu
+    image: dtiteam/intercom-mirotalksfu-lite:latest
+    container_name: intercom-mirotalksfu-lite
     restart: unless-stopped
     environment:
       - NODE_ENV=production
       # Configuración de servidor local (predeterminado)
       - LOCAL_SFU_ENABLED=true
       - LOCAL_SFU_IP=${LOCAL_SFU_IP:-192.168.1.100}
-      - LOCAL_SFU_PORT=8080
+      - LOCAL_SFU_PORT=3000
       - LOCAL_SFU_LISTEN_IP=0.0.0.0
       - LOCAL_SFU_MIN_PORT=40000
-      - LOCAL_SFU_MAX_PORT=50000
+      - LOCAL_SFU_MAX_PORT=40010
       # Configuración del servidor fallback (internet)
       - FALLBACK_SFU_ENABLED=true
       - FALLBACK_SFU_IP=${FALLBACK_SFU_IP:-CAMBIAR_A_IP_PÚBLICA}
-      - FALLBACK_SFU_PORT=8080
+      - FALLBACK_SFU_PORT=3000
       - FALLBACK_SFU_LISTEN_IP=0.0.0.0
-      - FALLBACK_SFU_MIN_PORT=40000
-      - FALLBACK_SFU_MAX_PORT=50000
       # Parámetros para el fallback
       - FALLBACK_TIMEOUT_MS=5000
       - FALLBACK_MAX_RETRIES=3
       # Compatibilidad con variables antiguas
-      - SFU_PORT=8080
+      - SFU_PORT=3000
       - SFU_MIN_PORT=40000
-      - SFU_MAX_PORT=50000
+      - SFU_MAX_PORT=40010
       - SFU_LISTEN_IP=0.0.0.0
       # Valores para configuración activa
       - SFU_PUBLIC_IP=${LOCAL_SFU_IP:-192.168.1.100}
@@ -115,15 +113,15 @@ services:
       - API_KEY_SECRET=${API_KEY_SECRET:-intercom_api_secret_change_this_in_production}
       - JWT_KEY=${JWT_KEY:-intercom_jwt_secret_change_this_in_production}
     ports:
-      - "8080:8080/tcp"
-      - "40000-50000:40000-50000/udp"
+      - "3000:3000"
+      - "40000-40010:40000-40010/udp"
     networks:
       - intercom-network
     volumes:
       # Persistencia para grabaciones (si se habilitan)
-      - ./mirotalksfu/app/rec:/app/app/rec
+      - ./mirotalksfu-lite/app/rec:/app/app/rec
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -159,7 +157,7 @@ services:
       - mongodb
       - pwa
       - signaling
-      - mirotalksfu
+      - mirotalksfu-lite
     volumes:
       - ./admin/logs:/app/logs
     healthcheck:

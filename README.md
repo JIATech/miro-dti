@@ -1,13 +1,13 @@
 # Sistema Intercom DTI
 
-Aplicación estilo portero intercom basada en WebRTC utilizando MiroTalkSFU para funciones de llamada, ringtone, atender y colgar.
+Aplicación estilo portero intercom basada en WebRTC utilizando MiroTalkSFU Lite para funciones de llamada, ringtone, atender y colgar.
 
 ## Estructura del Proyecto
 
 ```
 /miro-dti/
 ├── admin/             # Panel de administración y monitoreo
-├── mirotalksfu/       # Servidor SFU para WebRTC
+├── mirotalksfu-lite/   # Servidor SFU Lite para WebRTC
 ├── pwa/               # Aplicación Web Progresiva (interfaz de usuario)
 ├── signaling/         # Servidor de señalización WebSocket
 ├── docker-compose.yml # Configuración principal de servicios
@@ -18,7 +18,7 @@ Aplicación estilo portero intercom basada en WebRTC utilizando MiroTalkSFU para
 
 - **PWA**: Interfaz de usuario para tablets adaptada a diferentes roles (Portero, Administración, etc.)
 - **Signaling Server**: Coordina los eventos de llamada entre dispositivos
-- **MiroTalkSFU**: Gestiona los streams de audio/video WebRTC
+- **MiroTalkSFU Lite**: Gestiona los streams de audio/video WebRTC de manera optimizada
 - **Admin Panel**: Monitorización centralizada del sistema y dispositivos
 
 ## Arquitectura Docker
@@ -31,7 +31,7 @@ El sistema está containerizado utilizando Docker y orquestado con Docker Compos
 |-------------|--------------------------------|----------------|--------|----------------------------------------|
 | PWA         | dtiteam/intercom-pwa:latest    | nginx:alpine   | 80     | Aplicación web para tablets            |
 | Signaling   | dtiteam/intercom-signaling:latest | node:20-alpine | 3000   | Servidor de señalización WebSocket     |
-| MiroTalkSFU | dtiteam/intercom-mirotalksfu:latest | node:22-slim | 8080   | Servidor WebRTC para llamadas          |
+| MiroTalkSFU Lite | dtiteam/intercom-mirotalksfu-lite:latest | node:22-slim | 8080   | Servidor WebRTC para llamadas          |
 | Admin       | dtiteam/intercom-admin:latest  | node:20-alpine | 8090   | Panel de monitorización                |
 | MongoDB     | mongo:5.0                      | -              | 27017  | Base de datos para autenticación y logs|
 
@@ -53,7 +53,7 @@ Todas las imágenes implementan el principio de menor privilegio mediante usuari
   - Instalación determinista con `npm ci`
   - Solo dependencias de producción instaladas
 
-#### MiroTalkSFU
+#### MiroTalkSFU Lite
 - **Usuario**: `mirotalk` (UID 1000)
 - **Permisos**: Acceso a directorios específicos (/src, /src/app/rec, /src/app/logs)
 - **Consideraciones especiales**:
@@ -89,11 +89,11 @@ El equipo de infraestructura puede ajustar estas variables para personalizar el 
 LOCAL_SFU_IP=192.168.1.100        # IP local del servidor SFU
 FALLBACK_SFU_IP=example.com       # IP/dominio del servidor fallback
 SIGNALING_PORT=3000               # Puerto del servidor de señalización
-SFU_PORT=8080                     # Puerto del servidor MiroTalkSFU
+SFU_PORT=8080                     # Puerto del servidor MiroTalkSFU Lite
 ADMIN_PORT=8090                   # Puerto del panel de administración
 
 # Seguridad
-API_KEY_SECRET=secret_key_here    # Clave para API de MiroTalkSFU
+API_KEY_SECRET=secret_key_here    # Clave para API de MiroTalkSFU Lite
 JWT_KEY=jwt_secret_here           # Clave para autenticación JWT
 ADMIN_USER=admin                  # Usuario del panel admin (default: admin)
 ADMIN_PASSWORD=admin              # Contraseña (default: admin)
@@ -103,8 +103,8 @@ ADMIN_PASSWORD=admin              # Contraseña (default: admin)
 
 Para WebRTC es crucial configurar correctamente:
 
-- **TCP**: 80 (PWA), 3000 (Signaling), 8080 (MiroTalk), 8090 (Admin), 27017 (MongoDB)
-- **UDP**: 40000-50000 (Puertos WebRTC para streams de audio/video)
+- **TCP**: 80 (PWA), 3000 (Signaling), 8080 (MiroTalkSFU Lite), 8090 (Admin), 27017 (MongoDB)
+- **UDP**: 40000-40010 (Puertos WebRTC para streams de audio/video)
 
 ### Despliegue en Producción
 
@@ -125,7 +125,7 @@ Los siguientes volúmenes preservan datos entre reinicios:
 
 - `/mongodb_data`: Base de datos MongoDB
 - `./signaling/logs`: Logs del servidor de señalización
-- `./mirotalksfu/app/rec`: Grabaciones (si se habilitan)
+- `./mirotalksfu-lite/app/rec`: Grabaciones (si se habilitan)
 - `./admin/logs`: Logs del panel de administración
 
 ## Monitorización y Administración
@@ -179,49 +179,60 @@ Este sistema implementa:
    - Implementar HTTPS con certificados válidos
    - Configurar firewall con puertos específicos
 
-## Desarrollo Avanzado
+## Componentes Externos
 
-### Gestión de MiroTalkSFU como Submódulo Git
+### MiroTalkSFU Lite
 
-MiroTalkSFU se gestiona como un submódulo Git para mantener la referencia al repositorio original mientras se permite su integración con este proyecto. Esto asegura que los desarrolladores puedan acceder al código fuente completo y actualizado.
+MiroTalkSFU Lite es un fork optimizado de MiroTalkSFU, adaptado específicamente para las necesidades del sistema Intercom DTI. A diferencia de versiones anteriores del proyecto, ahora este componente está **integrado directamente** en el repositorio (no es un submódulo) en la carpeta `/mirotalksfu-lite`.
 
-#### Para quienes clonan este repositorio:
+Las principales optimizaciones realizadas incluyen:
 
-Para asegurarte de que la carpeta `mirotalksfu` contenga todo el código fuente después de clonar el repositorio, ejecuta:
+- Reducción significativa de puertos utilizados (solo 3000/TCP y 40000-40010/UDP)
+- Interfaz simplificada para uso específico como intercom
+- Desactivación de características innecesarias (chat, pizarra, etc.)
+- Configuración optimizada para sistemas con 5-10 dispositivos
+
+Este fork está basado en el excelente trabajo de Miroslav Pejic en [MiroTalkSFU](https://github.com/miroslavpejic85/mirotalksfu), al cual damos todo el crédito por el código base original.
+
+### Actualización y Mantenimiento
+
+Como este componente ahora es parte integral del repositorio principal, se actualiza junto con el resto del proyecto:
 
 ```bash
-# Clonar el repositorio principal
+# Clonar el repositorio completo
 git clone https://github.com/JIATech/miro-dti.git
 cd miro-dti
-
-# Inicializar y actualizar el submódulo de MiroTalkSFU
-git submodule update --init --recursive
 ```
 
-Este comando descargará automáticamente el código fuente original de MiroTalkSFU en la carpeta correspondiente.
+Si deseas contribuir mejoras específicas a MiroTalkSFU Lite:
 
-#### Configuración del submódulo:
+1. Realiza los cambios en la carpeta `/mirotalksfu-lite`
+2. Asegúrate de probar localmente con `docker-compose up`
+3. Envía un Pull Request con tus modificaciones
 
-MiroTalkSFU ya está configurado como submódulo Git en este repositorio. No es necesario realizar ninguna configuración adicional para utilizarlo.
+### Personalización Adicional
 
-#### Actualización del submódulo a versiones más recientes:
+Si necesitas adaptar aún más la configuración de MiroTalkSFU Lite, puedes modificar los siguientes archivos:
 
-Para actualizar el submódulo a la última versión del repositorio original:
+- `/mirotalksfu-lite/app/src/config.js`: Configuración principal del servicio
+- `/mirotalksfu-lite/docker-compose.template.yml`: Plantilla para despliegue independiente
 
-```bash
-# Entrar al directorio del submódulo
-cd mirotalksfu
+### WallPanel
 
-# Cambiar a la rama principal y actualizar
-git checkout main
-git pull origin main
+Para el despliegue en tablets, este proyecto utiliza WallPanel como aplicación contenedora, aprovechando sus capacidades de:
 
-# Volver al directorio raíz y confirmar la actualización
-cd ..
-git add mirotalksfu
-git commit -m "Actualizar submódulo MiroTalkSFU a la última versión"
-```
+- Identificación única de dispositivos
+- Modo kiosco para aplicación en pantalla completa
+- Inicio automático después de reinicios
+- Integración profunda con hardware Android
 
-#### Personalizaciones sobre MiroTalkSFU
+La documentación detallada sobre la integración con WallPanel se encuentra en la carpeta `/docs/wallpanel` e incluye:
 
-Las personalizaciones específicas para el sistema Intercom DTI deben gestionarse cuidadosamente para facilitar futuras actualizaciones del submódulo. Se recomienda documentar todos los cambios realizados sobre la versión original.
+- [Introducción y descripción general](./docs/wallpanel/README.md)
+- [Configuración recomendada](./docs/wallpanel/configuracion_recomendada.md)
+- [Referencia de la API de JavaScript](./docs/wallpanel/api_reference.md)
+
+El código fuente de referencia (solo para análisis) se encuentra en `/libs/wallpanel`.
+
+WallPanel es un proyecto de código abierto y se puede descargar desde:
+https://github.com/WallPanel-Project/wallpanel-android

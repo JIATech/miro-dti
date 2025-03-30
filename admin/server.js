@@ -11,6 +11,7 @@ const os = require('os');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
+const mqtt = require('mqtt');
 
 // Configuración
 const PORT = process.env.ADMIN_PORT || 8090;
@@ -19,6 +20,9 @@ const LOG_RETENTION_DAYS = 7; // Días que se mantienen los logs
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/intercom';
+const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://localhost:1883';
+const MQTT_USERNAME = process.env.MQTT_USERNAME || '';
+const MQTT_PASSWORD = process.env.MQTT_PASSWORD || '';
 
 // Configuración de política de retención de datos para tablets
 const DEFAULT_RETENTION_POLICY = {
@@ -69,10 +73,24 @@ mongoose.connect(MONGO_URI, {
 const TabletSchema = new mongoose.Schema({
     deviceName: { type: String, required: true, unique: true },
     deviceType: { type: String, required: true },
+    userName: { type: String },
+    displayName: { type: String },
     status: { type: String, default: 'offline' },
     lastSeen: { type: Date, default: Date.now },
     lastSync: { type: Date },
     ipAddress: { type: String },
+    wallpanel: {
+        deviceId: String,
+        androidId: String,
+        manufacturer: String,
+        model: String,
+        ip: String,
+        batteryLevel: Number,
+        isCharging: Boolean,
+        screenOn: Boolean,
+        version: String,
+        lastPing: Date
+    },
     metrics: { type: Object, default: {} },
     logs: { type: Array, default: [] },
     callHistory: { type: Array, default: [] }
@@ -112,6 +130,113 @@ const initDefaultRetentionPolicy = async () => {
 };
 
 initDefaultRetentionPolicy();
+
+// Inicialización del cliente MQTT
+let mqttClient;
+const initMQTT = () => {
+    try {
+        const mqttOptions = {
+            clientId: `admin-panel-${Date.now()}`,
+            clean: true,
+            reconnectPeriod: 5000
+        };
+        
+        // Añadir credenciales si están configuradas
+        if (MQTT_USERNAME && MQTT_PASSWORD) {
+            mqttOptions.username = MQTT_USERNAME;
+            mqttOptions.password = MQTT_PASSWORD;
+        }
+        
+        mqttClient = mqtt.connect(MQTT_BROKER, mqttOptions);
+        
+        mqttClient.on('connect', () => {
+            logger.info('Conectado al broker MQTT:', MQTT_BROKER);
+            // Suscribirse a respuestas y actualizaciones de estado de dispositivos
+            mqttClient.subscribe('intercom/+/response/#');
+            mqttClient.subscribe('intercom/+/status/#');
+        });
+        
+        mqttClient.on('message', async (topic, message) => {
+            try {
+                // Formato esperado: intercom/DEVICE-ID/tipo/subtipo
+                const parts = topic.split('/');
+                if (parts.length < 3) return;
+                
+                const deviceId = parts[1];
+                const messageType = parts[2];
+                
+                // Procesar mensajes según tipo
+                if (messageType === 'response') {
+                    const command = parts[3] || 'unknown';
+                    const data = JSON.parse(message.toString());
+                    logger.info(`Respuesta de ${deviceId} para comando ${command}:`, data);
+                    
+                    // Emitir al socket para actualizar UI en tiempo real
+                    io.emit('device:response', { deviceId, command, data });
+                    
+                    // Registrar respuesta en base de datos
+                    const tablet = await Tablet.findOne({ 'wallpanel.deviceId': deviceId });
+                    if (tablet) {
+                        await Tablet.updateOne(
+                            { 'wallpanel.deviceId': deviceId },
+                            { 
+                                $push: { 
+                                    logs: {
+                                        timestamp: new Date(),
+                                        level: 'info',
+                                        message: `Respuesta ${command}: ${JSON.stringify(data)}`
+                                    } 
+                                }
+                            }
+                        );
+                    }
+                }
+                else if (messageType === 'status') {
+                    const statusType = parts[3] || 'general';
+                    const data = JSON.parse(message.toString());
+                    
+                    // Actualizar estado del dispositivo en base de datos
+                    const tablet = await Tablet.findOne({ 'wallpanel.deviceId': deviceId });
+                    
+                    if (tablet) {
+                        const update = { 
+                            'lastSeen': new Date(), 
+                            'status': 'online' 
+                        };
+                        
+                        // Actualizar campos específicos según el tipo de estado
+                        if (statusType === 'battery') {
+                            update['wallpanel.batteryLevel'] = data.value || 0;
+                            update['wallpanel.isCharging'] = data.charging || false;
+                        }
+                        else if (statusType === 'screen') {
+                            update['wallpanel.screenOn'] = data.value || false;
+                        }
+                        
+                        await Tablet.updateOne(
+                            { 'wallpanel.deviceId': deviceId },
+                            { $set: update }
+                        );
+                        
+                        // Emitir actualización a UI
+                        io.emit('device:status', { deviceId, statusType, data });
+                    }
+                }
+            } catch (error) {
+                logger.error('Error procesando mensaje MQTT:', error);
+            }
+        });
+        
+        mqttClient.on('error', (error) => {
+            logger.error('Error en conexión MQTT:', error);
+        });
+    } catch (error) {
+        logger.error('Error inicializando MQTT:', error);
+    }
+};
+
+// Iniciar MQTT
+initMQTT();
 
 // Inicialización de servidor Express
 const app = express();
@@ -751,6 +876,226 @@ app.get('/api/tablets/storage-status', async (req, res) => {
             message: 'Error al obtener estado de almacenamiento',
             error: error.message
         });
+    }
+});
+
+// Rutas para control de dispositivos WallPanel
+app.post('/api/wallpanel/update', async (req, res) => {
+    try {
+        const { deviceId, androidId, status } = req.body;
+        
+        if (!deviceId) {
+            return res.status(400).json({
+                success: false,
+                message: 'ID de dispositivo requerido'
+            });
+        }
+        
+        // Buscar tablet por deviceId o androidId
+        let tablet = await Tablet.findOne({
+            $or: [
+                { 'wallpanel.deviceId': deviceId },
+                { 'wallpanel.androidId': androidId }
+            ]
+        });
+        
+        // Si no existe, crearlo con nombre por defecto
+        if (!tablet) {
+            tablet = new Tablet({
+                deviceName: `tablet-${deviceId.substring(0, 8)}`,
+                deviceType: 'wallpanel',
+                wallpanel: { 
+                    deviceId, 
+                    androidId,
+                    lastPing: new Date()
+                }
+            });
+        }
+        
+        // Actualizar información de estado
+        if (status) {
+            tablet.wallpanel = {
+                ...tablet.wallpanel,
+                ...status,
+                lastPing: new Date()
+            };
+        }
+        
+        tablet.status = 'online';
+        tablet.lastSeen = new Date();
+        
+        await tablet.save();
+        
+        // Notificar a clientes conectados
+        io.emit('device:update', { deviceName: tablet.deviceName });
+        
+        return res.json({
+            success: true,
+            message: 'Estado actualizado',
+            deviceName: tablet.deviceName
+        });
+    } catch (error) {
+        logger.error('Error al actualizar estado de WallPanel:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error interno',
+            error: error.message
+        });
+    }
+});
+
+app.post('/api/tablets/:deviceName/command', async (req, res) => {
+    try {
+        const { deviceName } = req.params;
+        const { command, value } = req.body;
+        
+        // Validar comandos permitidos
+        const allowedCommands = ['reload', 'relaunch', 'brightness', 'wake', 'volume', 'speak', 'url'];
+        if (!allowedCommands.includes(command)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Comando no válido'
+            });
+        }
+        
+        // Buscar dispositivo
+        const tablet = await Tablet.findOne({ deviceName });
+        
+        if (!tablet || !tablet.wallpanel || !tablet.wallpanel.deviceId) {
+            return res.status(404).json({
+                success: false,
+                message: 'Dispositivo no encontrado o no es WallPanel'
+            });
+        }
+        
+        // Enviar comando vía MQTT
+        const topic = `intercom/${tablet.wallpanel.deviceId}/command/${command}`;
+        mqttClient.publish(topic, JSON.stringify({ value }));
+        
+        // Registrar comando en historial
+        await Tablet.updateOne(
+            { deviceName },
+            { 
+                $push: { 
+                    logs: {
+                        timestamp: new Date(),
+                        level: 'info',
+                        message: `Comando enviado: ${command} - ${JSON.stringify(value)}`
+                    } 
+                }
+            }
+        );
+        
+        logger.info(`Comando enviado a ${deviceName}: ${command}`, { value });
+        
+        return res.json({
+            success: true,
+            message: `Comando ${command} enviado a ${deviceName}`
+        });
+    } catch (error) {
+        logger.error('Error al enviar comando:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al enviar comando',
+            error: error.message
+        });
+    }
+});
+
+app.post('/api/tablets/:deviceName/assign', async (req, res) => {
+    try {
+        const { deviceName } = req.params;
+        const { userName, displayName } = req.body;
+        
+        if (!userName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Nombre de usuario requerido'
+            });
+        }
+        
+        // Actualizar tablet con información de usuario
+        const result = await Tablet.updateOne(
+            { deviceName },
+            { 
+                $set: { 
+                    userName,
+                    displayName: displayName || `Tablet de ${userName}`
+                }
+            }
+        );
+        
+        if (result.nModified === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'Tablet no encontrado'
+            });
+        }
+        
+        logger.info(`Tablet ${deviceName} asignado a usuario ${userName}`);
+        
+        return res.json({
+            success: true,
+            message: `Tablet asignado a ${userName}`
+        });
+    } catch (error) {
+        logger.error('Error al asignar tablet:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error al asignar tablet',
+            error: error.message
+        });
+    }
+});
+
+// API para notificar actualizaciones a las tablets
+app.post('/api/notify-update', async (req, res) => {
+    try {
+        const { version, force = false } = req.body;
+        
+        if (!version) {
+            return res.status(400).json({ success: false, message: 'Se requiere versión para la notificación de actualización' });
+        }
+        
+        logger.info(`Notificando actualización versión ${version} a todas las tablets`, { force });
+        
+        // Actualizar archivo de versión
+        const versionData = {
+            version,
+            buildDate: new Date().toISOString(),
+            forceUpdate: force
+        };
+        
+        // Publicar mensaje MQTT para notificar a todas las tablets
+        if (mqttClient && mqttClient.connected) {
+            mqttClient.publish('intercom/update/notification', JSON.stringify(versionData));
+            logger.info('Mensaje MQTT de actualización enviado');
+        } else {
+            logger.warn('Cliente MQTT no conectado, no se pudo enviar notificación');
+        }
+        
+        // Registrar el evento de actualización
+        const tablets = await Tablet.find({});
+        for (const tablet of tablets) {
+            addLog('system', {
+                timestamp: new Date(),
+                level: 'info',
+                message: `Notificación de actualización enviada: versión ${version}, forzada: ${force}`,
+                device: tablet.deviceName,
+                component: 'update-manager'
+            });
+        }
+        
+        return res.json({ 
+            success: true, 
+            message: 'Notificación de actualización enviada', 
+            notifiedTablets: tablets.length,
+            version,
+            force
+        });
+    } catch (error) {
+        logger.error('Error al notificar actualización:', error);
+        return res.status(500).json({ success: false, message: 'Error al notificar actualización', error: error.message });
     }
 });
 

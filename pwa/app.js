@@ -7,9 +7,11 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
     // DOM Elements
-    const roleSelector = document.getElementById('role');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
     const loginBtn = document.getElementById('login-btn');
     const loginForm = document.getElementById('login-form');
+    const loginError = document.getElementById('login-error');
     const mainInterface = document.getElementById('main-interface');
     const buttonsContainer = document.querySelector('.buttons-container');
     const callInterface = document.getElementById('call-interface');
@@ -146,6 +148,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // App State
     const appState = {
         currentRole: '',
+        displayName: '',
+        token: '',
+        userId: '',
         inCall: false,
         callTarget: null,
         callStartTime: null,
@@ -155,7 +160,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         isRegistered: false,
         incomingCall: null,
         deviceId: generateDeviceId(),
-        connectionQuality: null
+        connectionQuality: null,
+        isLoggedIn: false
     };
 
     // Initialize app
@@ -186,14 +192,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Check if we're in a frame, for kiosk mode detection
         checkKioskMode();
         
-        // Load saved role if exists
-        await loadSavedRole();
+        // Check if we have a saved session
+        await checkSavedSession();
         
         // Cargar historial de llamadas
         await loadCallHistory();
-        
-        // Registrar esta tablet con el servidor PWA para admin
-        registerWithAdminServer();
         
         // Iniciar el envío periódico de métricas al servidor
         startMetricsCollection();
@@ -210,9 +213,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 appState.isRegistered = true;
                 
                 // Registrar este cliente con el servidor
-                if (appState.currentRole) {
+                if (appState.token) {
                     socket.emit('register', {
-                        role: appState.currentRole,
+                        token: appState.token,
                         deviceId: appState.deviceId
                     });
                 }
@@ -245,113 +248,602 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Setup de event listeners para la interfaz
     function setupEventListeners() {
-        // Event listener para el botón de login
+        // Login
         loginBtn.addEventListener('click', handleLogin);
         
-        // Event listener para tecla Enter en el selector de rol
-        roleSelector.addEventListener('keyup', (event) => {
+        // Forgot Password
+        const forgotPasswordLink = document.getElementById('forgot-password-link');
+        if (forgotPasswordLink) {
+            forgotPasswordLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                showResetPasswordModal();
+            });
+        }
+        
+        // Reset Password Modal
+        const closeResetModalBtn = document.getElementById('close-reset-modal-btn');
+        if (closeResetModalBtn) {
+            closeResetModalBtn.addEventListener('click', hideResetPasswordModal);
+        }
+        
+        const cancelResetBtn = document.getElementById('cancel-reset-btn');
+        if (cancelResetBtn) {
+            cancelResetBtn.addEventListener('click', hideResetPasswordModal);
+        }
+        
+        const saveResetBtn = document.getElementById('save-reset-btn');
+        if (saveResetBtn) {
+            saveResetBtn.addEventListener('click', handlePasswordReset);
+        }
+        
+        // Logout
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', handleLogout);
+        }
+        
+        // Cambio de contraseña
+        const changePasswordBtn = document.getElementById('change-password-btn');
+        if (changePasswordBtn) {
+            changePasswordBtn.addEventListener('click', showChangePasswordModal);
+        }
+        
+        // Modal de cambio de contraseña
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        if (closeModalBtn) {
+            closeModalBtn.addEventListener('click', hideChangePasswordModal);
+        }
+        
+        const cancelPasswordBtn = document.getElementById('cancel-password-btn');
+        if (cancelPasswordBtn) {
+            cancelPasswordBtn.addEventListener('click', hideChangePasswordModal);
+        }
+        
+        const savePasswordBtn = document.getElementById('save-password-btn');
+        if (savePasswordBtn) {
+            savePasswordBtn.addEventListener('click', handlePasswordChange);
+        }
+        
+        // Event listener para tecla Enter en el campo de usuario
+        usernameInput.addEventListener('keyup', (event) => {
+            if (event.key === 'Enter') {
+                passwordInput.focus();
+            }
+        });
+        
+        // Event listener para tecla Enter en el campo de contraseña
+        passwordInput.addEventListener('keyup', (event) => {
             if (event.key === 'Enter') {
                 handleLogin();
             }
         });
         
-        // Event listeners para botones de llamada (se añadirán dinámicamente)
-        
-        // Event listener para colgar llamada
-        hangupBtn.addEventListener('click', () => {
-            endCall();
+        // Event listener para tecla Escape en modales
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                const changePasswordModal = document.getElementById('change-password-modal');
+                if (changePasswordModal && !changePasswordModal.classList.contains('hidden')) {
+                    hideChangePasswordModal();
+                }
+                
+                const resetPasswordModal = document.getElementById('reset-password-modal');
+                if (resetPasswordModal && !resetPasswordModal.classList.contains('hidden')) {
+                    hideResetPasswordModal();
+                }
+            }
         });
         
-        // Event listener para silenciar/activar micrófono
+        // Call functionality
+        // Los botones de llamada se generan dinámicamente, usamos event delegation
+        buttonsContainer.addEventListener('click', (event) => {
+            const callButton = event.target.closest('.call-button');
+            if (callButton) {
+                const targetRole = callButton.dataset.target;
+                if (targetRole) {
+                    initiateCall(targetRole);
+                }
+            }
+        });
+        
+        // Call controls
+        hangupBtn.addEventListener('click', endCall);
         muteBtn.addEventListener('click', toggleMute);
         
-        // Event listener para el control de volumen del micrófono
-        const micVolumeSlider = document.getElementById('mic-volume');
-        if (micVolumeSlider) {
-            micVolumeSlider.addEventListener('input', (e) => {
-                // Convertir valor de 0-100 a 0-1
-                const volume = e.target.value / 100;
-                adjustMicVolume(volume);
+        // Control de volumen
+        const micVolumeControl = document.getElementById('mic-volume');
+        if (micVolumeControl) {
+            micVolumeControl.addEventListener('input', (e) => {
+                adjustMicVolume(e.target.value / 100);
             });
         }
         
-        // Event listeners para entrada y salida del modo de pantalla completa
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        
-        // Prevenir que el usuario pueda hacer zoom en la aplicación
-        document.addEventListener('wheel', preventZoom, { passive: false });
+        // Prevenir zoom en dispositivos táctiles
         document.addEventListener('touchmove', preventZoom, { passive: false });
+        
+        // Manejo de cambios en pantalla completa
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        document.addEventListener('MSFullscreenChange', handleFullscreenChange);
     }
     
-    // Manejar login con el rol seleccionado
-    function handleLogin() {
-        const selectedRole = roleSelector.value;
+    // Mostrar modal de recuperación de contraseña
+    function showResetPasswordModal() {
+        const modal = document.getElementById('reset-password-modal');
+        if (modal) {
+            // Limpiar campos y mensajes anteriores
+            document.getElementById('reset-username').value = '';
+            document.getElementById('reset-new-password').value = '';
+            document.getElementById('reset-confirm-password').value = '';
+            document.getElementById('reset-error').classList.add('hidden');
+            document.getElementById('reset-success').classList.add('hidden');
+            
+            // Ocultar el formulario de reset y mostrar paso de verificación
+            document.getElementById('reset-password-form').classList.add('hidden');
+            document.getElementById('device-verification-step').classList.remove('hidden');
+            
+            // Deshabilitar botón de reset
+            document.getElementById('save-reset-btn').disabled = true;
+            
+            // Mostrar modal
+            modal.classList.remove('hidden');
+            
+            // Iniciar verificación del dispositivo
+            verifyDeviceForPasswordReset();
+        }
+    }
+    
+    // Ocultar modal de recuperación de contraseña
+    function hideResetPasswordModal() {
+        const modal = document.getElementById('reset-password-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+    
+    // Verificar el dispositivo para reset de contraseña
+    async function verifyDeviceForPasswordReset() {
+        const statusElement = document.getElementById('device-verification-status');
+        const saveButton = document.getElementById('save-reset-btn');
+        const resetForm = document.getElementById('reset-password-form');
         
-        if (!selectedRole) {
-            alert('Por favor, selecciona un rol para continuar');
+        try {
+            // Obtener nombre de usuario si está disponible en el campo de login
+            const username = document.getElementById('username').value || '';
+            
+            // Intentar obtener identificador del dispositivo
+            const deviceInfo = await getDeviceIdentifier();
+            
+            // Añadir username a la info del dispositivo para verificación
+            deviceInfo.username = username;
+            
+            // Verificar el dispositivo con el servidor
+            const response = await fetch(`${config.signalingServer}/api/auth/verify-device`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    deviceInfo: deviceInfo
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.verified) {
+                // Dispositivo verificado correctamente
+                statusElement.textContent = '✅ Dispositivo reconocido. Puedes restablecer tu contraseña.';
+                statusElement.classList.add('success');
+                statusElement.classList.remove('error');
+                
+                // Mostrar formulario de reset
+                resetForm.classList.remove('hidden');
+                
+                // Habilitar botón de reset
+                saveButton.disabled = false;
+                
+                // Si ya hay un username en el campo de login, añadirlo al campo de reset
+                if (username) {
+                    document.getElementById('reset-username').value = username;
+                }
+                
+                // Registrar en logs
+                await IntercomDB.addLogEntry('security', 'Dispositivo autorizado para recuperación de contraseña', {
+                    timestamp: new Date(),
+                    deviceInfo: deviceInfo
+                });
+            } else {
+                // Dispositivo no reconocido
+                statusElement.textContent = '❌ Dispositivo no reconocido. Por motivos de seguridad, no puedes restablecer la contraseña desde este dispositivo.';
+                statusElement.classList.add('error');
+                statusElement.classList.remove('success');
+                
+                // Mantener oculto el formulario
+                resetForm.classList.add('hidden');
+                
+                // Mantener deshabilitado el botón
+                saveButton.disabled = true;
+                
+                // Registrar en logs
+                await IntercomDB.addLogEntry('security', 'Intento de recuperación desde dispositivo no autorizado', {
+                    timestamp: new Date(),
+                    deviceInfo: deviceInfo
+                });
+            }
+        } catch (error) {
+            console.error('Error verificando dispositivo:', error);
+            
+            // Mostrar error
+            statusElement.textContent = '❌ Error al verificar el dispositivo. Por favor, inténtalo de nuevo más tarde.';
+            statusElement.classList.add('error');
+            statusElement.classList.remove('success');
+            
+            // Mantener oculto el formulario
+            resetForm.classList.add('hidden');
+            
+            // Mantener deshabilitado el botón
+            saveButton.disabled = true;
+            
+            // Registrar en logs
+            await IntercomDB.addLogEntry('error', 'Error al verificar dispositivo para recuperación', {
+                timestamp: new Date(),
+                error: error.message || 'Error desconocido'
+            });
+        }
+    }
+    
+    // Manejar reset de contraseña
+    async function handlePasswordReset() {
+        const usernameInput = document.getElementById('reset-username');
+        const newPasswordInput = document.getElementById('reset-new-password');
+        const confirmPasswordInput = document.getElementById('reset-confirm-password');
+        const errorElement = document.getElementById('reset-error');
+        const successElement = document.getElementById('reset-success');
+        const saveButton = document.getElementById('save-reset-btn');
+        
+        // Obtener valores
+        const username = usernameInput.value;
+        const newPassword = newPasswordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+        
+        // Limpiar mensajes anteriores
+        errorElement.classList.add('hidden');
+        successElement.classList.add('hidden');
+        
+        // Validar entradas
+        if (!username || !newPassword || !confirmPassword) {
+            errorElement.textContent = 'Todos los campos son obligatorios';
+            errorElement.classList.remove('hidden');
             return;
         }
         
-        // Guardar el rol seleccionado
-        appState.currentRole = selectedRole;
-        localStorage.setItem('intercom-role', selectedRole);
-        
-        // Registrar con el servidor de señalización
-        if (socket && socket.connected) {
-            socket.emit('register', {
-                role: selectedRole,
-                deviceId: appState.deviceId
-            });
+        // Verificar que las contraseñas coincidan
+        if (newPassword !== confirmPassword) {
+            errorElement.textContent = 'Las contraseñas nuevas no coinciden';
+            errorElement.classList.remove('hidden');
+            return;
         }
         
-        // Configurar la interfaz según el rol
-        setupRoleInterface(selectedRole);
+        // Verificar longitud mínima
+        if (newPassword.length < 6) {
+            errorElement.textContent = 'La contraseña debe tener al menos 6 caracteres';
+            errorElement.classList.remove('hidden');
+            return;
+        }
         
-        // Ocultar login, mostrar interfaz principal
-        loginForm.parentElement.classList.add('hidden');
-        mainInterface.classList.remove('hidden');
-        
-        // Registrar con el servidor de admin con el nuevo rol
-        registerWithAdminServer();
-        
-        // Intentar entrar en modo pantalla completa para modo kiosco
-        requestFullscreen();
-    }
-    
-    // Cargar rol guardado, si existe
-    async function loadSavedRole() {
         try {
-            const savedRole = localStorage.getItem('intercom-role');
+            // Obtener identificador del dispositivo para incluirlo en la solicitud
+            const deviceInfo = await getDeviceIdentifier();
             
-            if (savedRole && departmentConfig[savedRole]) {
-                // Autoseleccionar el rol guardado
-                roleSelector.value = savedRole;
-                
-                // Autologin si hay un rol guardado
-                handleLogin();
-                
-                return true;
+            // Deshabilitar botón durante la petición
+            saveButton.disabled = true;
+            saveButton.textContent = 'Procesando...';
+            
+            // Enviar solicitud al servidor
+            const response = await fetch(`${config.signalingServer}/api/auth/reset-password`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username,
+                    newPassword,
+                    deviceInfo
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.message || 'Error al restablecer la contraseña');
             }
             
-            return false;
+            // Mostrar mensaje de éxito
+            successElement.textContent = 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.';
+            successElement.classList.remove('hidden');
+            
+            // Registrar en log
+            await IntercomDB.addLogEntry('security', 'Contraseña restablecida exitosamente', {
+                timestamp: new Date(),
+                username: username,
+                deviceInfo: deviceInfo
+            });
+            
+            // Cerrar modal después de 3 segundos
+            setTimeout(() => {
+                hideResetPasswordModal();
+                // Enfocar campo de usuario para facilitar nuevo inicio de sesión
+                document.getElementById('username').value = username;
+                document.getElementById('username').focus();
+            }, 3000);
+            
         } catch (error) {
-            console.error('Error al cargar rol guardado:', error);
+            console.error('Error al restablecer contraseña:', error);
+            errorElement.textContent = error.message || 'Error al restablecer la contraseña. Inténtalo de nuevo.';
+            errorElement.classList.remove('hidden');
+            
+            // Registrar error en logs
+            await IntercomDB.addLogEntry('error', 'Error en recuperación de contraseña', {
+                timestamp: new Date(),
+                username: username,
+                errorMessage: error.message
+            });
+        } finally {
+            // Restablecer el botón
+            saveButton.disabled = false;
+            saveButton.textContent = 'Restablecer Contraseña';
+        }
+    }
+    
+    // Obtener identificador único del dispositivo (con soporte para WallPanel)
+    async function getDeviceIdentifier() {
+        // Objeto para almacenar toda la información del dispositivo
+        let deviceInfo = {};
+        
+        // 1. Intentar obtener información a través de WallPanel
+        if (typeof window.WallPanel !== 'undefined') {
+            try {
+                deviceInfo = {
+                    source: 'wallpanel',
+                    deviceId: window.WallPanel.getDeviceId(),
+                    androidId: window.WallPanel.getAndroidId(),
+                    appVersion: window.WallPanel.getAppVersion(),
+                    serialNumber: window.WallPanel.getSerialNumber(),
+                    manufacturer: window.WallPanel.getDeviceManufacturer(),
+                    model: window.WallPanel.getDeviceModel()
+                };
+                console.log('Dispositivo identificado via WallPanel JS Bridge');
+            } catch (e) {
+                console.error('Error accediendo a WallPanel JS Bridge:', e);
+            }
+        }
+        
+        // 2. Si no funcionó WallPanel JS Bridge, intentar API REST de WallPanel
+        if (!deviceInfo.deviceId) {
+            try {
+                const response = await fetch('http://localhost:2971/api/info');
+                if (response.ok) {
+                    const wallPanelInfo = await response.json();
+                    deviceInfo = {
+                        source: 'wallpanel_rest',
+                        deviceId: wallPanelInfo.deviceId,
+                        androidId: wallPanelInfo.androidId,
+                        appVersion: wallPanelInfo.appVersion,
+                        ipAddress: wallPanelInfo.ipAddress
+                    };
+                    console.log('Dispositivo identificado via WallPanel REST API');
+                }
+            } catch (e) {
+                console.log('WallPanel REST API no disponible:', e);
+            }
+        }
+        
+        // 3. Si ninguna API de WallPanel funcionó, obtener toda la información posible del navegador
+        if (!deviceInfo.deviceId) {
+            // UUID almacenado localmente (ya implementado)
+            const storedUuid = localStorage.getItem('intercom-device-id') || appState.deviceId;
+            
+            // Fingerprinting básico del navegador
+            const browserFingerprint = await generateBrowserFingerprint();
+            
+            deviceInfo = {
+                source: 'browser',
+                uuid: storedUuid,
+                fingerprint: browserFingerprint,
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                screenResolution: `${window.screen.width}x${window.screen.height}`,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                colorDepth: window.screen.colorDepth
+            };
+            console.log('Dispositivo identificado via navegador estándar');
+        }
+        
+        // Agregar timestamp a la información
+        deviceInfo.timestamp = new Date().toISOString();
+        
+        // Guardar en base de datos local
+        await saveDeviceInfoToLocalStorage(deviceInfo);
+        
+        return deviceInfo;
+    }
+    
+    // Generar fingerprint del navegador
+    async function generateBrowserFingerprint() {
+        // Combinar varios puntos de datos para crear una huella única
+        const fingerPrintData = [
+            navigator.userAgent,
+            navigator.language,
+            new Date().getTimezoneOffset(),
+            navigator.hardwareConcurrency,
+            navigator.deviceMemory,
+            navigator.platform,
+            navigator.vendor,
+            window.screen.width,
+            window.screen.height,
+            window.screen.colorDepth
+        ].join('|');
+        
+        try {
+            // Usar SubtleCrypto para generar un hash más seguro
+            const encoder = new TextEncoder();
+            const data = encoder.encode(fingerPrintData);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        } catch (e) {
+            // Fallback a hash simple si crypto API no está disponible
+            console.error('Error generando fingerprint con SubtleCrypto:', e);
+            return simpleHash(fingerPrintData);
+        }
+    }
+    
+    // Función de hash simple para fallback
+    function simpleHash(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convertir a entero de 32 bits
+        }
+        return hash.toString(16);
+    }
+    
+    // Guardar información del dispositivo en localStorage
+    async function saveDeviceInfoToLocalStorage(deviceInfo) {
+        try {
+            // Guardar UUID principal si viene de WallPanel
+            if (deviceInfo.source.includes('wallpanel') && deviceInfo.deviceId) {
+                localStorage.setItem('intercom-device-id', deviceInfo.deviceId);
+            }
+            
+            // Guardar la información completa
+            localStorage.setItem('intercom-device-info', JSON.stringify(deviceInfo));
+            
+            // También guardar en IndexedDB para persistencia adicional
+            if (IntercomDB && typeof IntercomDB.saveDeviceInfo === 'function') {
+                await IntercomDB.saveDeviceInfo(deviceInfo);
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Error guardando info del dispositivo:', error);
             return false;
+        }
+    }
+    
+    // Manejar login con el rol seleccionado
+    async function handleLogin() {
+        const username = usernameInput.value;
+        const password = passwordInput.value;
+        
+        if (!username || !password) {
+            alert('Por favor, ingresa un nombre de usuario y contraseña para continuar');
+            return;
+        }
+        
+        try {
+            // Obtener información del dispositivo para enviar al servidor
+            const deviceInfo = await getDeviceIdentifier();
+            
+            // Autenticar con el servidor
+            authenticateUser(username, password, deviceInfo);
+        } catch (error) {
+            console.error('Error al preparar login:', error);
+            authenticateUser(username, password);
+        }
+    }
+    
+    // Autenticar usuario con el servidor
+    async function authenticateUser(username, password, deviceInfo) {
+        try {
+            // Mostrar indicador de carga
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Autenticando...';
+            loginError.classList.add('hidden');
+            
+            const response = await fetch(`${config.signalingServer}/api/auth/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username,
+                    password,
+                    deviceInfo
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || 'Error de autenticación');
+            }
+            
+            // Guardar información del usuario en el estado de la app
+            appState.token = data.token;
+            appState.currentRole = data.user.role;
+            appState.displayName = data.user.displayName;
+            appState.userId = data.user.id;
+            
+            // Guardar token en localStorage para persistencia de sesión
+            localStorage.setItem('intercom-token', appState.token);
+            
+            console.log('Usuario autenticado:', appState.displayName);
+            
+            // Registrar con el servidor de señalización
+            if (socket && socket.connected) {
+                socket.emit('register', {
+                    token: appState.token,
+                    deviceId: appState.deviceId
+                });
+            }
+            
+            // Configurar la interfaz según el rol
+            setupRoleInterface();
+            
+            // Ocultar login, mostrar interfaz principal
+            loginForm.parentElement.classList.add('hidden');
+            mainInterface.classList.remove('hidden');
+            
+            // Registrar con el servidor de admin
+            registerWithAdminServer();
+            
+            // Intentar entrar en modo pantalla completa para modo kiosco
+            requestFullscreen();
+            
+            // Añadir entrada de log para el inicio de sesión
+            await IntercomDB.addLogEntry('auth', 'Inicio de sesión exitoso', {
+                timestamp: new Date(),
+                role: appState.currentRole,
+                displayName: appState.displayName
+            });
+            
+        } catch (error) {
+            console.error('Error al autenticar:', error);
+            loginError.textContent = error.message || 'Error al autenticar. Por favor, inténtalo de nuevo.';
+            loginError.classList.remove('hidden');
+            
+            // Añadir entrada de log para el error de inicio de sesión
+            await IntercomDB.addLogEntry('error', 'Error de inicio de sesión', {
+                timestamp: new Date(),
+                username: username,
+                errorMessage: error.message || 'Error desconocido'
+            });
+        } finally {
+            // Restablecer el botón de inicio de sesión
+            loginBtn.disabled = false;
+            loginBtn.textContent = 'Iniciar Sesión';
         }
     }
     
     // Configurar la interfaz según el rol seleccionado
-    function setupRoleInterface(role) {
-        appState.currentRole = role;
-        const roleConfig = departmentConfig[role] || { targets: [] };
-        
-        // Actualizar localStorage con el rol seleccionado
-        localStorage.setItem('selectedRole', role);
-        
+    function setupRoleInterface() {
         // Actualizar título del departamento
         const departmentTitle = document.getElementById('department-title');
         if (departmentTitle) {
-            departmentTitle.textContent = roleConfig.title || `${role.charAt(0).toUpperCase() + role.slice(1)} DTI`;
+            departmentTitle.textContent = `Bienvenido, ${appState.displayName}`;
         }
         
         // Ocultar la pantalla de selección de rol
@@ -364,7 +856,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         buttonsContainer.innerHTML = '';
         
         // Crear botones dinámicamente para cada objetivo
-        roleConfig.targets.forEach(target => {
+        departmentConfig.portero.targets.forEach(target => {
             const button = document.createElement('button');
             button.classList.add('role-button', 'call-button');
             button.dataset.target = target.id;
@@ -388,10 +880,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             buttonsContainer.appendChild(button);
         });
         
-        // Registrar con el servidor para recibir llamadas
-        socket.emit('register', { role, deviceId: appState.deviceId });
-        
-        console.log(`Interfaz configurada para rol: ${role}`);
+        console.log('Interfaz configurada');
     }
     
     // Iniciar una llamada a otro departamento
@@ -410,7 +899,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Iniciar UI de llamada
             appState.callTarget = targetRole;
-            callTargetEl.textContent = departmentConfig[targetRole]?.targets.find(t => t.id === targetRole)?.label || targetRole;
+            callTargetEl.textContent = departmentConfig.portero.targets.find(t => t.id === targetRole)?.label || targetRole;
             
             // Mostrar interfaz de llamada
             mainInterface.classList.add('hidden');
@@ -421,7 +910,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Emitir evento de llamada al servidor de señalización
             socket.emit('call', {
-                from: appState.currentRole,
+                from: appState.userId,
                 to: targetRole,
                 deviceId: appState.deviceId
             });
@@ -454,7 +943,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (appState.inCall) {
             // Rechazar automáticamente si ya estamos en una llamada
             socket.emit('reject', {
-                from: appState.currentRole,
+                from: appState.userId,
                 to: fromRole,
                 reason: 'busy'
             });
@@ -470,14 +959,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         sounds.ringtone.play();
         
         // Mostrar una alerta de confirmación en lugar de aceptar automáticamente
-        const callerName = departmentConfig[fromRole]?.title || fromRole;
+        const callerName = departmentConfig.portero.targets.find(t => t.id === fromRole)?.label || fromRole;
         if (confirm(`Llamada entrante de ${callerName}. ¿Deseas contestar?`)) {
             acceptIncomingCall();
         } else {
             // Si rechaza, detener sonido y enviar señal de rechazo
             stopAllSounds();
             socket.emit('reject', {
-                from: appState.currentRole,
+                from: appState.userId,
                 to: fromRole,
                 reason: 'rejected'
             });
@@ -501,7 +990,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             stopAllSounds();
             
             // Obtener nombre para mostrar
-            const callerName = departmentConfig[appState.incomingCall]?.title || appState.incomingCall;
+            const callerName = departmentConfig.portero.targets.find(t => t.id === appState.incomingCall)?.label || appState.incomingCall;
             callTargetEl.textContent = callerName;
             
             // Mostrar interfaz de llamada
@@ -513,7 +1002,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Notificar al servidor que se aceptó la llamada
             socket.emit('accept', {
-                from: appState.currentRole,
+                from: appState.userId,
                 to: appState.incomingCall
             });
             
@@ -543,7 +1032,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function startWebRTCCall(targetRole) {
         try {
             // Generar ID de sala único para esta llamada
-            appState.currentRoom = `call-${appState.currentRole}-${targetRole}-${Date.now()}`;
+            appState.currentRoom = `call-${appState.userId}-${targetRole}-${Date.now()}`;
             
             // Obtener el servidor SFU óptimo (local o fallback)
             const serverUrl = appState.mirotalksfu.currentServer === 'local' 
@@ -598,7 +1087,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const networkConfig = params.networkConfig;
         
         // Base URL
-        let url = `${serverUrl}/join/${roomId}?name=${appState.currentRole}`;
+        let url = `${serverUrl}/join/${roomId}?name=${appState.displayName}`;
         
         // Parámetros básicos
         url += `&audio=${params.audio}&video=${params.video}&screen=${params.screen}&notify=false&hide=true`;
@@ -779,7 +1268,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'participant-left':
                 // Participante dejó la llamada
                 console.log('Participante salió:', data.name);
-                if (data.name !== appState.currentRole) {
+                if (data.name !== appState.displayName) {
                     // Si el otro participante se fue, terminar la llamada
                     endCall();
                 }
@@ -853,7 +1342,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Notificar al servidor que se terminó la llamada
             if (socket && socket.connected) {
                 socket.emit('hangup', {
-                    from: appState.currentRole,
+                    from: appState.userId,
                     to: appState.callTarget
                 });
             }
@@ -1060,9 +1549,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 },
                 body: JSON.stringify({
                     deviceId: appState.deviceId,
-                    deviceName: appState.currentRole,
-                    deviceType: appState.currentRole === 'portero' ? 'portero' : 'departamento',
-                    role: appState.currentRole,
+                    deviceName: appState.displayName,
+                    deviceType: 'tablet',
+                    role: 'user',
                     ip: deviceInfo.ip || 'unknown',
                     version: deviceInfo.appVersion || '1.0.0'
                 })
@@ -1112,7 +1601,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 body: JSON.stringify({
                     deviceId: appState.deviceId,
                     metrics: {
-                        role: appState.currentRole,
+                        role: 'user',
                         battery: deviceInfo.battery?.level || 0,
                         version: deviceInfo.appVersion || '1.0.0',
                         performance: {
@@ -1403,6 +1892,145 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // Verificar si hay una sesión guardada
+    async function checkSavedSession() {
+        try {
+            const savedToken = localStorage.getItem('intercom-token');
+            
+            // Primero intentar verificar con el token guardado
+            if (savedToken) {
+                console.log('Verificando token guardado...');
+                
+                // Verificar la validez del token con el servidor
+                const response = await fetch(`${config.signalingServer}/api/auth/verify`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${savedToken}`
+                    }
+                });
+                
+                if (response.ok) {
+                    // Token válido, obtener información del usuario
+                    const userData = await response.json();
+                    
+                    // Actualizar estado de la aplicación
+                    appState.token = savedToken;
+                    appState.userId = userData.user.id;
+                    appState.displayName = userData.user.displayName;
+                    appState.currentRole = userData.user.role;
+                    appState.isLoggedIn = true;
+                    
+                    console.log('Sesión válida recuperada:', userData.user.displayName);
+                    
+                    // Registrar con el servidor de señalización
+                    if (socket && socket.connected) {
+                        socket.emit('register', {
+                            token: appState.token,
+                            deviceId: appState.deviceId
+                        });
+                    }
+                    
+                    // Iniciar interfaz según el rol
+                    setupRoleInterface();
+                    loginForm.parentElement.classList.add('hidden');
+                    mainInterface.classList.remove('hidden');
+                    
+                    return true;
+                } else {
+                    console.log('Token inválido o expirado, eliminando...');
+                    localStorage.removeItem('intercom-token');
+                }
+            }
+            
+            // Si no hay token o el token es inválido, intentar login automático por dispositivo
+            return await tryDeviceAutoLogin();
+            
+        } catch (error) {
+            console.error('Error al verificar sesión guardada:', error);
+            return false;
+        }
+    }
+    
+    // Intentar inicio de sesión automático por dispositivo
+    async function tryDeviceAutoLogin() {
+        try {
+            // Obtener información del dispositivo
+            const deviceInfo = await getDeviceIdentifier();
+            
+            console.log('Intentando inicio de sesión automático por dispositivo...');
+            
+            // Solicitar inicio de sesión automático al servidor
+            const response = await fetch(`${config.signalingServer}/api/auth/device-login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    deviceInfo
+                })
+            });
+            
+            const data = await response.json();
+            
+            // Si el dispositivo está reconocido, iniciar sesión automáticamente
+            if (response.ok && data.success) {
+                console.log('Inicio de sesión automático exitoso:', data.user.displayName);
+                
+                // Guardar token y datos de usuario
+                appState.token = data.token;
+                appState.userId = data.user.id;
+                appState.username = data.user.username;
+                appState.displayName = data.user.displayName;
+                appState.currentRole = data.user.role;
+                appState.isLoggedIn = true;
+                
+                // Guardar en localStorage para persistencia
+                localStorage.setItem('intercom-token', data.token);
+                localStorage.setItem('intercom-user', JSON.stringify({
+                    id: data.user.id,
+                    username: data.user.username,
+                    displayName: data.user.displayName,
+                    role: data.user.role
+                }));
+                
+                // Registrar en logs
+                await IntercomDB.addLogEntry('auth', 'Inicio de sesión automático exitoso', {
+                    timestamp: new Date(),
+                    username: data.user.username
+                });
+                
+                // Registrar con el servidor de señalización
+                if (socket && socket.connected) {
+                    socket.emit('register', {
+                        token: appState.token,
+                        deviceId: appState.deviceId
+                    });
+                }
+                
+                // Actualizar interfaz según el rol
+                await setupRoleInterface();
+                loginForm.parentElement.classList.add('hidden');
+                mainInterface.classList.remove('hidden');
+                
+                // Intentar entrar en modo pantalla completa para modo kiosco
+                requestFullscreen();
+                
+                return true;
+            } else if (data.requiresLogin) {
+                console.log('El dispositivo requiere inicio de sesión manual');
+                // No hacer nada, se mostrará la pantalla de login
+            } else {
+                console.error('Error en inicio de sesión automático:', data.message);
+            }
+            
+            return false;
+            
+        } catch (error) {
+            console.error('Error al intentar inicio de sesión automático:', error);
+            return false;
+        }
+    }
+
     // Initialize the app
     init();
     
@@ -1413,4 +2041,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     setInterval(() => {
         IntercomSync.syncData();
     }, 3600000); // 1 hora
+    
+    // Función para manejar el cierre de sesión
+    function handleLogout() {
+        // Mostrar confirmación antes de cerrar sesión
+        if (confirm('¿Estás seguro que deseas cerrar sesión?')) {
+            // Registrar acción en logs
+            IntercomDB.addLogEntry('auth', 'Cierre de sesión', {
+                timestamp: new Date(),
+                role: appState.currentRole,
+                displayName: appState.displayName
+            }).catch(error => console.error('Error al registrar cierre de sesión:', error));
+            
+            // Si hay una llamada activa, terminarla
+            if (appState.inCall) {
+                endCall();
+            }
+            
+            // Notificar al servidor que el dispositivo se desconecta
+            if (socket && socket.connected) {
+                socket.emit('unregister', {
+                    token: appState.token,
+                    deviceId: appState.deviceId
+                });
+            }
+            
+            // Limpiar el estado de la aplicación
+            appState.token = '';
+            appState.userId = '';
+            appState.displayName = '';
+            appState.currentRole = '';
+            
+            // Eliminar token del almacenamiento local
+            localStorage.removeItem('intercom-token');
+            
+            // Limpiar campos de login
+            usernameInput.value = '';
+            passwordInput.value = '';
+            loginError.classList.add('hidden');
+            
+            // Mostrar formulario de login y ocultar interfaz principal
+            loginForm.parentElement.classList.remove('hidden');
+            mainInterface.classList.add('hidden');
+            callInterface.classList.add('hidden');
+            
+            console.log('Sesión cerrada exitosamente');
+        }
+    }
 });

@@ -20,21 +20,33 @@
         <header>
             <h1>Sistema de Intercom</h1>
             <div id="login-form">
-                <select id="role">
-                    <option value="">Seleccionar Rol...</option>
-                    <option value="portero">Portero</option>
-                    <option value="administracion">Administración</option>
-                    <option value="sistemas">Sistemas</option>
-                    <option value="soporte">Soporte</option>
-                    <option value="infraestructura">Infraestructura</option>
-                </select>
-                <button id="login-btn">Entrar</button>
+                <div class="input-group">
+                    <input type="text" id="username" placeholder="Usuario" autocomplete="username">
+                </div>
+                <div class="input-group">
+                    <input type="password" id="password" placeholder="Contraseña" autocomplete="current-password">
+                </div>
+                <button id="login-btn">Iniciar Sesión</button>
+                <div id="login-error" class="error-message hidden"></div>
+                <div class="forgot-password">
+                    <a href="#" id="forgot-password-link">¿Olvidaste tu contraseña?</a>
+                </div>
             </div>
         </header>
 
         <main>
             <!-- Interfaz simplificada para cada rol -->
             <div id="main-interface" class="hidden">
+                <div class="top-buttons">
+                    <button id="change-password-btn" class="change-password-button">
+                        <span class="icon">🔑</span>
+                        <span class="label">Cambiar Contraseña</span>
+                    </button>
+                    <button id="logout-btn" class="logout-button">
+                        <span class="icon">🚪</span>
+                        <span class="label">Cerrar Sesión</span>
+                    </button>
+                </div>
                 <h1 id="department-title" class="department-title">Departamento DTI</h1>
                 <div class="buttons-container">
                     <!-- Los botones se generarán dinámicamente por JavaScript -->
@@ -73,6 +85,74 @@
         <footer>
             <p>Sistema Intercom v1.0</p>
         </footer>
+    </div>
+
+    <!-- Modal de cambio de contraseña -->
+    <div id="change-password-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Cambiar Contraseña</h2>
+                <button id="close-modal-btn" class="close-button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label for="current-password">Contraseña Actual</label>
+                    <input type="password" id="current-password" placeholder="Contraseña actual">
+                </div>
+                <div class="input-group">
+                    <label for="new-password">Nueva Contraseña</label>
+                    <input type="password" id="new-password" placeholder="Nueva contraseña">
+                </div>
+                <div class="input-group">
+                    <label for="confirm-password">Confirmar Contraseña</label>
+                    <input type="password" id="confirm-password" placeholder="Confirmar nueva contraseña">
+                </div>
+                <div id="password-error" class="error-message hidden"></div>
+                <div id="password-success" class="success-message hidden"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancel-password-btn" class="secondary-button">Cancelar</button>
+                <button id="save-password-btn" class="primary-button">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de recuperación de contraseña -->
+    <div id="reset-password-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Recuperar Contraseña</h2>
+                <button id="close-reset-modal-btn" class="close-button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="device-verification-step">
+                    <p class="info-message">Verificando el dispositivo...</p>
+                    <div class="loading-spinner"></div>
+                    <div id="device-verification-status" class="info-message"></div>
+                </div>
+                
+                <div id="reset-password-form" class="hidden">
+                    <div class="input-group">
+                        <label for="reset-username">Nombre de Usuario</label>
+                        <input type="text" id="reset-username" placeholder="Tu nombre de usuario">
+                    </div>
+                    <div class="input-group">
+                        <label for="reset-new-password">Nueva Contraseña</label>
+                        <input type="password" id="reset-new-password" placeholder="Nueva contraseña">
+                    </div>
+                    <div class="input-group">
+                        <label for="reset-confirm-password">Confirmar Contraseña</label>
+                        <input type="password" id="reset-confirm-password" placeholder="Confirmar nueva contraseña">
+                    </div>
+                    <div id="reset-error" class="error-message hidden"></div>
+                    <div id="reset-success" class="success-message hidden"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancel-reset-btn" class="secondary-button">Cancelar</button>
+                <button id="save-reset-btn" class="primary-button" disabled>Restablecer Contraseña</button>
+            </div>
+        </div>
     </div>
 
     <!-- Service worker registration -->

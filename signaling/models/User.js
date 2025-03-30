@@ -51,6 +51,29 @@ const userSchema = new mongoose.Schema({
       notifications: true
     }
   },
+  authorizedDevices: {
+    type: [{
+      deviceId: String,
+      androidId: String,
+      source: String,
+      manufacturer: String,
+      model: String,
+      fingerprint: String,
+      uuid: String,
+      userAgent: String,
+      ipAddress: String,
+      autoLogin: {
+        type: Boolean,
+        default: true
+      },
+      lastUsed: Date,
+      firstRegistered: {
+        type: Date,
+        default: Date.now
+      }
+    }],
+    default: []
+  },
   createdAt: {
     type: Date,
     default: Date.now
