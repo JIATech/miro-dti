@@ -4,6 +4,7 @@
  */
 
 const request = require('supertest');
+// eslint-disable-next-line no-unused-vars
 const mongoose = require('mongoose');
 const mqtt = require('mqtt');
 

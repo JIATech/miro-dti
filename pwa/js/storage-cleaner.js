@@ -150,7 +150,6 @@ class StorageCleaner {
    */
   async cleanData(policy) {
     console.log('Iniciando limpieza de datos con política:', policy);
-    const cleanupStart = new Date();
     const results = {
       callHistoryRemoved: 0,
       standardLogsRemoved: 0,
@@ -160,6 +159,10 @@ class StorageCleaner {
     };
 
     try {
+      // Registro de inicio de limpieza
+      // eslint-disable-next-line no-unused-vars
+      const cleanupStart = new Date().toISOString();
+
       // 1. Limpieza de historial de llamadas
       results.callHistoryRemoved = await this.cleanCallHistory(policy.callHistory);
 

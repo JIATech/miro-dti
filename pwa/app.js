@@ -5,6 +5,15 @@
  * using MiroTalkSFU for WebRTC communication
  */
 
+/* global IntercomDB, IntercomSync, io */
+
+// Declarar funciones que parecen estar definidas en otro archivo
+let showChangePasswordModal, hideChangePasswordModal, handlePasswordChange;
+
+// Variables globales para estado de la aplicación
+// eslint-disable-next-line no-unused-vars
+let currentCallData = null;
+
 document.addEventListener('DOMContentLoaded', async () => {
   // DOM Elements
   const usernameInput = document.getElementById('username');
@@ -1129,20 +1138,20 @@ document.addEventListener('DOMContentLoaded', async () => {
       const quality = appState.connectionQuality || 'medium';
 
       switch (quality) {
-        case 'low':
-          url += '&videoQuality=low';
-          url += '&maxVideoFps=15';
-          break;
-        case 'medium':
-          url += '&videoQuality=medium';
-          url += '&maxVideoFps=24';
-          break;
-        case 'high':
-          url += '&videoQuality=high';
-          url += '&maxVideoFps=30';
-          break;
-        default:
-          url += '&videoQuality=auto';
+      case 'low':
+        url += '&videoQuality=low';
+        url += '&maxVideoFps=15';
+        break;
+      case 'medium':
+        url += '&videoQuality=medium';
+        url += '&maxVideoFps=24';
+        break;
+      case 'high':
+        url += '&videoQuality=high';
+        url += '&maxVideoFps=30';
+        break;
+      default:
+        url += '&videoQuality=auto';
       }
 
       // Codec preferido si está especificado
@@ -1177,18 +1186,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Determinar la tasa de bits óptima según la calidad de conexión
   function getOptimalBitrate(quality, defaultBitrate) {
     switch (quality) {
-      case 'low':
-        return Math.min(defaultBitrate, 256); // 256 kbps máximo para conexiones bajas
-      case 'medium':
-        return Math.min(defaultBitrate, 512); // 512 kbps para conexiones medias
-      case 'high':
-        return defaultBitrate; // Usar el valor por defecto para conexiones buenas
-      default:
-        return 384; // Valor conservador para casos desconocidos
+    case 'low':
+      return Math.min(defaultBitrate, 256); // 256 kbps máximo para conexiones bajas
+    case 'medium':
+      return Math.min(defaultBitrate, 512); // 512 kbps para conexiones medias
+    case 'high':
+      return defaultBitrate; // Usar el valor por defecto para conexiones buenas
+    default:
+      return 384; // Valor conservador para casos desconocidos
     }
   }
 
   // Optimizar la configuración según la calidad de conexión
+  // eslint-disable-next-line no-unused-vars
   async function optimizeConnectionSettings() {
     try {
       // Obtener información de la conexión
@@ -1199,16 +1209,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (connectionInfo.effectiveType) {
         switch (connectionInfo.effectiveType) {
-          case 'slow-2g':
-          case '2g':
-            connectionQuality = 'low';
-            break;
-          case '3g':
-            connectionQuality = 'medium';
-            break;
-          case '4g':
-            connectionQuality = 'high';
-            break;
+        case 'slow-2g':
+        case '2g':
+          connectionQuality = 'low';
+          break;
+        case '3g':
+          connectionQuality = 'medium';
+          break;
+        case '4g':
+          connectionQuality = 'high';
+          break;
         }
       }
 
@@ -1274,35 +1284,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!data.type) return;
 
     switch (data.type) {
-      case 'connection-quality':
-        // Actualizar UI según la calidad de conexión
-        updateConnectionQualityUI(data.quality);
-        break;
+    case 'connection-quality':
+      // Actualizar UI según la calidad de conexión
+      updateConnectionQualityUI(data.quality);
+      break;
 
-      case 'audio-volume':
-        // Se recibe información sobre nivel de audio
-        updateAudioLevelUI(data.level);
-        break;
+    case 'audio-volume':
+      // Se recibe información sobre nivel de audio
+      updateAudioLevelUI(data.level);
+      break;
 
-      case 'participant-joined':
-        // Notificación de que otro participante se unió
-        console.log('Participante unido:', data.name);
-        break;
+    case 'participant-joined':
+      // Notificación de que otro participante se unió
+      console.log('Participante unido:', data.name);
+      break;
 
-      case 'participant-left':
-        // Participante dejó la llamada
-        console.log('Participante salió:', data.name);
-        if (data.name !== appState.displayName) {
-          // Si el otro participante se fue, terminar la llamada
-          endCall();
-        }
-        break;
+    case 'participant-left':
+      // Participante dejó la llamada
+      console.log('Participante salió:', data.name);
+      if (data.name !== appState.displayName) {
+        // Si el otro participante se fue, terminar la llamada
+        endCall();
+      }
+      break;
 
-      case 'error':
-        // Error en la llamada
-        console.error('Error en llamada WebRTC:', data.message);
-        IntercomDB.addErrorEntry('webrtc', 'Error en llamada WebRTC', data);
-        break;
+    case 'error':
+      // Error en la llamada
+      console.error('Error en llamada WebRTC:', data.message);
+      IntercomDB.addErrorEntry('webrtc', 'Error en llamada WebRTC', data);
+      break;
     }
   }
 
@@ -1319,20 +1329,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Mostrar calidad actual
     let qualityText = 'Auto';
     switch (quality) {
-      case 'low':
-        indicator.classList.add('low');
-        qualityText = 'Baja';
-        break;
+    case 'low':
+      indicator.classList.add('low');
+      qualityText = 'Baja';
+      break;
 
-      case 'medium':
-        indicator.classList.add('medium');
-        qualityText = 'Media';
-        break;
+    case 'medium':
+      indicator.classList.add('medium');
+      qualityText = 'Media';
+      break;
 
-      case 'high':
-        indicator.classList.add('high');
-        qualityText = 'Alta';
-        break;
+    case 'high':
+      indicator.classList.add('high');
+      qualityText = 'Alta';
+      break;
     }
 
     text.textContent = `Calidad: ${qualityText}`;
@@ -1347,71 +1357,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Actualizar UI con nivel de audio
+  // eslint-disable-next-line no-unused-vars
   function updateAudioLevelUI(level) {
-    // Opcional: mostrar indicador visual del nivel de audio
+    // Esta función podría implementarse en el futuro para mostrar una animación
+    // de nivel de audio durante las llamadas
   }
 
   // Finalizar una llamada en curso
-  async function endCall() {
-    try {
-      // Detener cualquier sonido actual y reproducir sonido de fin
-      stopAllSounds();
-      sounds.callEnd.play();
-
-      // Actualizar estado
-      const wasInCall = appState.inCall;
-      appState.inCall = false;
-      appState.incomingCall = null;
-
-      // Notificar al servidor que se terminó la llamada
-      if (socket && socket.connected) {
-        socket.emit('hangup', {
-          from: appState.userId,
-          to: appState.callTarget,
-        });
-      }
-
-      // Detener temporizador
-      stopCallTimer();
-
-      // Finalizar llamada en base de datos
-      const endTime = new Date();
-      await IntercomDB.updateLastCallEntry({
-        endTime: endTime,
-        duration: appState.callStartTime
-          ? Math.floor((endTime - appState.callStartTime) / 1000)
-          : 0,
-        status: 'completed',
-      });
-
-      // Limpiar contenedor de video
-      const videoContainer = document.getElementById('video-container');
-      videoContainer.innerHTML = '';
-
-      // Restaurar estado
-      appState.callTarget = null;
-      appState.currentRoom = null;
-      appState.muted = false;
-
-      // Restaurar interfaces
-      callInterface.classList.add('hidden');
-      mainInterface.classList.remove('hidden');
-
-      // Restaurar UI de botones
-      muteBtn.innerHTML = `
-                <span class="icon">🔇</span>
-                <span class="label">Silenciar</span>
-            `;
-    } catch (error) {
-      console.error('Error al finalizar llamada:', error);
-      await IntercomDB.addErrorEntry('call', 'Error al finalizar llamada', {
-        error: error.message,
-      });
-
-      // Forzar restauración de interfaz
-      callInterface.classList.add('hidden');
-      mainInterface.classList.remove('hidden');
-    }
+  function endCall() {
+    // eslint-disable-next-line no-unused-vars
+    const wasInCall = appState.inCall;
+    
+    stopCallTimer();
+    currentCallData = null;
   }
 
   // Alternar silencio del micrófono

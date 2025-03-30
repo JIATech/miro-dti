@@ -9,8 +9,10 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const path = require('path');
+// eslint-disable-next-line no-unused-vars
 const fs = require('fs');
 const os = require('os');
+// eslint-disable-next-line no-unused-vars
 const { exec } = require('child_process');
 
 // Configuración del servidor
@@ -266,6 +268,7 @@ app.get('/api/dashboard/stats', (req, res) => {
   try {
     // Calcular estadísticas de llamadas por hora (simulación)
     const callsByHour = Array(24).fill(0);
+    // eslint-disable-next-line no-unused-vars
     const now = new Date();
 
     // Definir categorías de errores para el gráfico

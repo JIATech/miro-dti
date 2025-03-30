@@ -18,11 +18,13 @@ const {
   updateLogDisplay,
   updateServiceStatus,
   updateTabletStatus,
+  // eslint-disable-next-line no-unused-vars
   handleDeviceResponse,
   applyTheme,
   saveGeneralSettings,
   saveTabletsSettings,
   changeAdminPassword,
+  // eslint-disable-next-line no-unused-vars
   addLog,
 } = window;
 
@@ -36,11 +38,15 @@ const {
   toggleFullscreen,
   fetchServiceStatus,
   handleServiceAction,
+  // eslint-disable-next-line no-unused-vars
   performServiceAction,
+  // eslint-disable-next-line no-unused-vars
   showConfirmDialog,
   confirmAction,
+  // eslint-disable-next-line no-unused-vars
   updateTabletCounter,
   updateStatsUI,
+  // eslint-disable-next-line no-unused-vars
   formatTimeAgo,
   toggleLogsPause,
   clearLogs,
@@ -98,8 +104,11 @@ const MAX_LOGS = 2000;
 
 // Inicializar Socket.IO
 let socket;
+// eslint-disable-next-line no-unused-vars
 let toastInstance;
+// eslint-disable-next-line no-unused-vars
 let confirmModal;
+// eslint-disable-next-line no-unused-vars
 let currentAction = {};
 
 // Formato de fecha y hora
@@ -387,26 +396,26 @@ function updateConnectionStatus(status) {
 
   // Aplicar clase según estado
   switch (status) {
-    case 'connected':
-      statusElement.classList.add('bg-success');
-      statusElement.textContent = 'Conectado';
-      break;
-    case 'disconnected':
-      statusElement.classList.add('bg-danger');
-      statusElement.textContent = 'Desconectado';
-      break;
-    case 'connecting':
-      statusElement.classList.add('bg-warning');
-      statusElement.textContent = 'Conectando...';
-      break;
-    case 'reconnecting':
-      statusElement.classList.add('bg-warning');
-      statusElement.textContent = `Reconectando (${appState.connection.reconnectAttempts})`;
-      break;
-    case 'failed':
-      statusElement.classList.add('bg-danger');
-      statusElement.textContent = 'Conexión fallida';
-      break;
+  case 'connected':
+    statusElement.classList.add('bg-success');
+    statusElement.textContent = 'Conectado';
+    break;
+  case 'disconnected':
+    statusElement.classList.add('bg-danger');
+    statusElement.textContent = 'Desconectado';
+    break;
+  case 'connecting':
+    statusElement.classList.add('bg-warning');
+    statusElement.textContent = 'Conectando...';
+    break;
+  case 'reconnecting':
+    statusElement.classList.add('bg-warning');
+    statusElement.textContent = `Reconectando (${appState.connection.reconnectAttempts})`;
+    break;
+  case 'failed':
+    statusElement.classList.add('bg-danger');
+    statusElement.textContent = 'Conexión fallida';
+    break;
   }
 }
 
@@ -521,12 +530,12 @@ function handleSystemEvent(event) {
   console.log('Evento del sistema:', event);
 
   switch (event.type) {
-    case 'service_change': {
-      // Actualizar el estado del servicio en la UI
-      updateServiceStatus(event.service, event.status);
+  case 'service_change': {
+    // Actualizar el estado del servicio en la UI
+    updateServiceStatus(event.service, event.status);
 
-      // Mostrar notificación
-      const statusMessage =
+    // Mostrar notificación
+    const statusMessage =
         event.status === 'running'
           ? 'Activo'
           : event.status === 'stopped'
@@ -535,32 +544,32 @@ function handleSystemEvent(event) {
               ? 'Reiniciando'
               : event.status;
 
-      showToast(
-        'Estado de Servicio',
-        `Servicio ${event.service}: ${statusMessage}`,
-        event.status === 'running' ? 'success' : event.status === 'stopped' ? 'danger' : 'warning'
-      );
-      break;
-    }
+    showToast(
+      'Estado de Servicio',
+      `Servicio ${event.service}: ${statusMessage}`,
+      event.status === 'running' ? 'success' : event.status === 'stopped' ? 'danger' : 'warning'
+    );
+    break;
+  }
 
-    case 'tablet_change': {
-      // Actualizar el estado de la tablet en la UI
-      updateTabletStatus(event.deviceId, event.status);
+  case 'tablet_change': {
+    // Actualizar el estado de la tablet en la UI
+    updateTabletStatus(event.deviceId, event.status);
 
-      // Mostrar notificación
-      showToast(
-        'Estado de Tablet',
-        `Tablet ${event.deviceName || event.deviceId}: ${event.status}`,
-        event.status === 'online' ? 'success' : 'warning'
-      );
-      break;
-    }
+    // Mostrar notificación
+    showToast(
+      'Estado de Tablet',
+      `Tablet ${event.deviceName || event.deviceId}: ${event.status}`,
+      event.status === 'online' ? 'success' : 'warning'
+    );
+    break;
+  }
 
-    case 'update_available': {
-      // Mostrar notificación de actualización disponible
-      showToast('Actualización', `Nueva actualización disponible: v${event.version}`, 'info');
-      break;
-    }
+  case 'update_available': {
+    // Mostrar notificación de actualización disponible
+    showToast('Actualización', `Nueva actualización disponible: v${event.version}`, 'info');
+    break;
+  }
   }
 }
 

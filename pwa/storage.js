@@ -47,6 +47,7 @@ const IntercomDB = (function () {
 
         // Store para configuraciones
         if (!db.objectStoreNames.contains(STORES.SETTINGS)) {
+          // eslint-disable-next-line no-unused-vars
           const settingsStore = db.createObjectStore(STORES.SETTINGS, { keyPath: 'key' });
         }
 

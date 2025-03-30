@@ -1,10 +1,12 @@
 /**
- * Tests para la API de gestión de tablets
+ * Tests para las APIs de gestión de tablets
  * JIATech Intercom DTI - Panel de administración
  */
 
 const request = require('supertest');
+// eslint-disable-next-line no-unused-vars
 const mongoose = require('mongoose');
+// eslint-disable-next-line no-unused-vars
 const mqtt = require('mqtt');
 
 // Mock de mongoose

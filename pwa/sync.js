@@ -1,8 +1,10 @@
 /**
- * Sistema de sincronización para enviar datos locales al panel de administración
- * Este módulo recopila información de IndexedDB y la envía periódicamente
- * al servidor de administración para monitoreo remoto
+ * IntercomSync - Módulo de sincronización para IntercomDB
+ * 
+ * Gestiona la sincronización de datos entre el dispositivo local y el servidor admin
  */
+
+/* global IntercomDB */
 
 const IntercomSync = (function () {
   // Configuración por defecto

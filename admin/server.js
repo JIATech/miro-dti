@@ -7,6 +7,7 @@ const winston = require('winston');
 const cron = require('node-cron');
 const Docker = require('dockerode');
 const basicAuth = require('express-basic-auth');
+// eslint-disable-next-line no-unused-vars
 const os = require('os');
 const cors = require('cors');
 const mongoose = require('mongoose');

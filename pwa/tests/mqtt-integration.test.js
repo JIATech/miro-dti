@@ -26,6 +26,7 @@ describe('Integración MQTT - Tests Básicos', () => {
       return true;
     }
 
+    // eslint-disable-next-line no-unused-vars
     publish(topic, message) {
       return true;
     }

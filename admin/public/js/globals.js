@@ -3,32 +3,34 @@
  * Definiciones globales
  */
 
+/* global bootstrap */
+
 // Helper function for status badges
 function getStatusBadgeClass(status) {
   switch (status ? status.toLowerCase() : 'unknown') {
-    case 'online':
-    case 'connected':
-    case 'active':
-    case 'running':
-      return 'bg-success';
-    case 'offline':
-    case 'disconnected':
-    case 'inactive':
-    case 'stopped':
-      return 'bg-danger';
-    case 'connecting':
-    case 'reconnecting':
-    case 'pending':
-      return 'bg-warning';
-    case 'error':
-      return 'bg-danger';
-    case 'idle':
-      return 'bg-secondary';
-    case 'ringing':
-    case 'busy':
-      return 'bg-info';
-    default:
-      return 'bg-secondary';
+  case 'online':
+  case 'connected':
+  case 'active':
+  case 'running':
+    return 'bg-success';
+  case 'offline':
+  case 'disconnected':
+  case 'inactive':
+  case 'stopped':
+    return 'bg-danger';
+  case 'connecting':
+  case 'reconnecting':
+  case 'pending':
+    return 'bg-warning';
+  case 'error':
+    return 'bg-danger';
+  case 'idle':
+    return 'bg-secondary';
+  case 'ringing':
+  case 'busy':
+    return 'bg-info';
+  default:
+    return 'bg-secondary';
   }
 }
 
@@ -194,7 +196,7 @@ function handleDeviceResponse(data) {
     // Example: if (window.requestStateUpdate) { window.requestStateUpdate(); }
   } else {
     showToast(
-      'Action Failed',
+      'Error Changing Password',
       `Action failed on ${deviceName}: ${data.message || 'No details provided.'}`,
       'danger'
     );
@@ -401,28 +403,28 @@ function clearLogsByTimePeriod(timePeriod) {
   const now = Date.now(); // Use timestamp for calculations
 
   switch (timePeriod) {
-    case '1h':
-      cutoffTimeISO = new Date(now - 3600 * 1000).toISOString();
-      break;
-    case '6h':
-      cutoffTimeISO = new Date(now - 6 * 3600 * 1000).toISOString();
-      break;
-    case '24h':
-      cutoffTimeISO = new Date(now - 24 * 3600 * 1000).toISOString();
-      break;
-    case '7d':
-      cutoffTimeISO = new Date(now - 7 * 24 * 3600 * 1000).toISOString();
-      break;
-    case '30d':
-      cutoffTimeISO = new Date(now - 30 * 24 * 3600 * 1000).toISOString();
-      break;
-    case 'all':
-      // No cutoff time needed, server should handle 'all' specifically
-      cutoffTimeISO = null; // Or a specific value server understands for 'all'
-      break;
-    default:
-      showToast('Error', 'Invalid time period selected for clearing logs.', 'warning');
-      return;
+  case '1h':
+    cutoffTimeISO = new Date(now - 3600 * 1000).toISOString();
+    break;
+  case '6h':
+    cutoffTimeISO = new Date(now - 6 * 3600 * 1000).toISOString();
+    break;
+  case '24h':
+    cutoffTimeISO = new Date(now - 24 * 3600 * 1000).toISOString();
+    break;
+  case '7d':
+    cutoffTimeISO = new Date(now - 7 * 24 * 3600 * 1000).toISOString();
+    break;
+  case '30d':
+    cutoffTimeISO = new Date(now - 30 * 24 * 3600 * 1000).toISOString();
+    break;
+  case 'all':
+    // No cutoff time needed, server should handle 'all' specifically
+    cutoffTimeISO = null; // Or a specific value server understands for 'all'
+    break;
+  default:
+    showToast('Error', 'Invalid time period selected for clearing logs.', 'warning');
+    return;
   }
 
   const payload = { timePeriod }; // Send the period identifier
