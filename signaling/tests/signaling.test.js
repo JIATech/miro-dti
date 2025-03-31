@@ -203,16 +203,15 @@ describe('Servidor de Señalización - Tests Básicos', function () {
     // Primer cliente se une
     clientSocket.emit('join', { roomId, deviceName: 'Emisor' });
 
-    // Segundo cliente
-    const receiverClient = io.connect(`http://localhost:${TEST_PORT}`, {
-      'force new connection': true,
-      transports: ['websocket'],
-    });
+    // Esperamos a que el primer cliente esté en la sala antes de continuar
+    clientSocket.on('room-users', () => {
+      // Segundo cliente
+      const receiverClient = io.connect(`http://localhost:${TEST_PORT}`, {
+        'force new connection': true,
+        transports: ['websocket'],
+      });
 
-    receiverClient.on('connect', () => {
-      receiverClient.emit('join', { roomId, deviceName: 'Receptor' });
-
-      // Escuchar señales
+      // Configurar receptor antes de que se conecte
       receiverClient.on('signal', (data) => {
         expect(data).to.have.property('from');
         expect(data).to.have.property('signal', 'test-signal-data');
@@ -220,15 +219,20 @@ describe('Servidor de Señalización - Tests Básicos', function () {
         done();
       });
 
-      // Una vez que el cliente receptor está en la sala, emitimos la señal
-      clientSocket.on('room-users', (users) => {
-        if (users.length > 0) {
-          // Enviar señal al otro cliente
-          clientSocket.emit('signal', {
-            to: users[0].deviceId,
-            signal: 'test-signal-data',
-          });
-        }
+      receiverClient.on('connect', () => {
+        receiverClient.emit('join', { roomId, deviceName: 'Receptor' });
+        
+        // Escuchar evento user-joined en el cliente emisor para saber cuándo podemos enviar la señal
+        clientSocket.once('user-joined', (user) => {
+          // Asegurarnos de que es el receptor
+          if (user.deviceName === 'Receptor') {
+            // Enviar señal al receptor
+            clientSocket.emit('signal', {
+              to: user.deviceId,
+              signal: 'test-signal-data',
+            });
+          }
+        });
       });
     });
   });
